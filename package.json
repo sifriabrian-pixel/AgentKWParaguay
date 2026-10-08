@@ -1,0 +1,20 @@
+{
+  "name": "kw-paraguay-agent",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Agente de WhatsApp para Keller Williams Paraguay (Sifer)",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "node --test --test-timeout=10000 test/*.test.js",
+    "test:e2e": "node test/e2e/redeploy.js"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.132.1",
+    "better-sqlite3": "^13.0.3",
+    "dotenv": "^18.0.6"
+  }
+}
