@@ -12,6 +12,7 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 | `src/webhook.js` | Guarda referral y mensaje en la base **antes** de procesar |
 | `src/agent.js` | Turno de conversación: cola por número, Claude, `guardar_datos`, envío |
 | `src/claude.js` | Llamada a Claude con la herramienta `guardar_datos` |
+| `src/catalogo.js` | Catálogo de propiedades: se carga desde `catalogo/*.json` al arrancar; el agente lo consulta con `buscar_propiedades` |
 | `src/campanas.js` | Resuelve `ad_id` → campaña (Meta Marketing API) y parsea `KWPY \| FLUJO \| ZONA \| ASESOR` |
 | `src/repo.js` / `src/db.js` | SQLite (WAL) y migraciones en `db/migrations/*.sql` |
 

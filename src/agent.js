@@ -13,6 +13,7 @@ const repo = require('./repo');
 const whatsapp = require('./whatsapp');
 const claude = require('./claude');
 const campanas = require('./campanas');
+const catalogo = require('./catalogo');
 const { pendiente } = require('../prompts/kw-py');
 
 const MAX_INTENTOS = 3;
@@ -123,6 +124,26 @@ function applyGuardarDatos(waId, input) {
   return `Guardado (${cambios.join('; ') || 'sin cambios'}). Ficha actual: flujo=${final.flujo || 'sin definir'}, datos=${JSON.stringify(final.datos)}`;
 }
 
+// ─── buscar_propiedades ──────────────────────────────────────────────────────
+
+function applyBuscarPropiedades(waId, input) {
+  const filtros = {
+    operacion: ['venta', 'alquiler'].includes(input.operacion) ? input.operacion : undefined,
+    tipo: typeof input.tipo === 'string' ? input.tipo : undefined,
+    zona: typeof input.zona === 'string' ? input.zona : undefined,
+    dormitorios_min: Number.isInteger(input.dormitorios_min) ? input.dormitorios_min : undefined,
+    presupuesto_max: typeof input.presupuesto_max === 'number' && input.presupuesto_max > 0 ? input.presupuesto_max : undefined,
+    moneda: ['USD', 'PYG'].includes(input.moneda) ? input.moneda : undefined,
+  };
+  const res = catalogo.buscar(filtros);
+  const lead = repo.getCurrentLead(waId);
+  repo.addEvent(lead.id, 'propiedades_buscadas', { filtros, total: res.total, ids: res.propiedades.map((p) => p.id) });
+  if (res.total === 0) {
+    return `Sin resultados en el catálogo para ${JSON.stringify(filtros)}. No invente opciones: diga que un asesor va a buscar alternativas y siga con el flujo.${res.nota ? ` Nota: ${res.nota}` : ''}`;
+  }
+  return JSON.stringify(res);
+}
+
 // ─── Contexto del turno ──────────────────────────────────────────────────────
 
 function fechaParaguay() {
@@ -206,7 +227,10 @@ async function processTurn(waId, pendientes) {
   let texto;
   let tags = [];
   try {
-    const res = await claude.chat(historial, buildContext(lead), (input) => applyGuardarDatos(waId, input));
+    const res = await claude.chat(historial, buildContext(lead), {
+      guardar_datos: (input) => applyGuardarDatos(waId, input),
+      buscar_propiedades: (input) => applyBuscarPropiedades(waId, input),
+    });
     tags = extractTags(res.texto);
     texto = cleanTags(res.texto);
     if (res.stopReason === 'refusal') repo.addEvent(lead.id, 'llm_refusal');
@@ -285,4 +309,4 @@ function idle() {
   return Promise.all([...enCurso.values()].map((e) => e.promise));
 }
 
-module.exports = { kick, recover, idle, describeInbound, mediaIdOf, extractTags, cleanTags, applyGuardarDatos, buildContext, toApiMessages };
+module.exports = { kick, recover, idle, describeInbound, mediaIdOf, extractTags, cleanTags, applyGuardarDatos, applyBuscarPropiedades, buildContext, toApiMessages };

@@ -31,6 +31,10 @@ module.exports = {
   // Aviso de protección de datos (se conserva de Impacta). URL de la política pendiente de KW.
   privacidad: { url: '[PENDIENTE]' },
 
+  // Catálogo de propiedades que el agente puede ofrecer. Por ahora, 10 fichas
+  // de prueba tomadas de kwparaguay.kw.com (todas en venta, Asunción y Lambaré).
+  catalogo: { archivo: 'catalogo/kw-py-prueba.json' },
+
   // Preguntas frecuentes: KW todavía no pasó el contenido.
   // Formato: { pregunta, respuesta }
   faq: [],

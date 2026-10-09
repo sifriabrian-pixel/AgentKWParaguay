@@ -51,12 +51,29 @@ const TOOLS = [{
     },
     additionalProperties: false,
   },
+}, {
+  name: 'buscar_propiedades',
+  description: 'Busca en el catálogo de Keller Williams Paraguay propiedades que coincidan con lo que pide el cliente. Usala solo cuando ya sabés la operación, el tipo y la zona. Devuelve hasta 3 opciones reales con su link; nunca muestres propiedades que no vengan de esta herramienta.',
+  input_schema: {
+    type: 'object',
+    properties: {
+      operacion: { type: 'string', enum: ['venta', 'alquiler'], description: 'venta si el cliente quiere comprar; alquiler si quiere alquilar' },
+      tipo: { type: 'string', description: 'departamento, monoambiente, casa, terreno, oficina, local comercial' },
+      zona: { type: 'string', description: 'barrio o ciudad, por ejemplo "Recoleta", "Las Lomas", "Lambaré"' },
+      dormitorios_min: { type: 'integer' },
+      presupuesto_max: { type: 'number' },
+      moneda: { type: 'string', enum: ['USD', 'PYG'] },
+    },
+    required: ['operacion'],
+    additionalProperties: false,
+  },
 }];
 
 // contexto: texto del turno (datos capturados, origen). Va en un bloque de
 // system aparte, sin cache, porque cambia en cada llamada.
-// onGuardarDatos(input) → string con el resultado para Claude.
-async function chat(historial, contexto, onGuardarDatos) {
+// handlers: { guardar_datos(input), buscar_propiedades(input) } → string con el
+// resultado que se le devuelve a Claude.
+async function chat(historial, contexto, handlers) {
   const system = [{ type: 'text', text: buildSystemPrompt(), cache_control: { type: 'ephemeral' } }];
   if (contexto) system.push({ type: 'text', text: contexto });
 
@@ -95,11 +112,12 @@ async function chat(historial, contexto, onGuardarDatos) {
     for (const uso of usos) {
       let contenido;
       let esError = false;
+      const handler = handlers[uso.name];
       try {
-        contenido = uso.name === 'guardar_datos' ? onGuardarDatos(uso.input || {}) : `Herramienta desconocida: ${uso.name}`;
-        esError = uso.name !== 'guardar_datos';
+        contenido = handler ? handler(uso.input || {}) : `Herramienta desconocida: ${uso.name}`;
+        esError = !handler;
       } catch (e) {
-        contenido = `Error guardando: ${e.message}`;
+        contenido = `Error en ${uso.name}: ${e.message}`;
         esError = true;
       }
       resultados.push({ type: 'tool_result', tool_use_id: uso.id, content: contenido, is_error: esError });
