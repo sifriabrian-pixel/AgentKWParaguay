@@ -62,6 +62,8 @@ test('buscar: "Cruz del Chaco, Asunción" trae las dos unidades de esa calle y n
   assert.deepEqual(ids(catalogo.buscar({ zona: 'Cruz del Chaco, Asunción' })), ['2165412433246526', '2165422816468416']);
   assert.equal(catalogo.buscar({ zona: 'Mova del Sol' }).total, 3);
   assert.equal(catalogo.buscar({ zona: 'Calle Inexistente' }).total, 0);
+  assert.equal(catalogo.buscar({ zona: 'Mova Recoleta' }).total, 2);
+  assert.match(catalogo.buscar({ zona: 'Cruz del Chaco' }).propiedades[1].descripcion, /Cocheras: USD 17\.000/);
 });
 
 test('consulta por propiedad puntual: propiedad_id completa tipo, zona y flujo con la ficha real', async () => {
@@ -76,6 +78,7 @@ test('consulta por propiedad puntual: propiedad_id completa tipo, zona y flujo c
   assert.deepEqual(lead.datos, { propiedad_id: '2165422816468416', proposito: 'inversion', tipo: 'departamento', zona: 'Recoleta, Asunción' });
   assert.ok(repo.events(lead.id).some((e) => e.type === 'propiedad_consultada' && e.payload.asesor_nombre === 'Maria de la Paz Ramirez'));
   assert.match(agent.buildContext(lead), /Consulta por esta propiedad: departamento en Recoleta/);
+  assert.match(agent.buildContext(lead), /Cocheras: USD 17\.000/);
 });
 
 test('un propiedad_id que no existe en el catálogo se descarta', async () => {

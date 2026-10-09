@@ -204,7 +204,10 @@ function buildContext(lead) {
   lineas.push(`- Aviso de protección de datos: ${lead.consent_at ? 'YA enviado, no lo repita' : 'todavía NO enviado: si en este mensaje pide un dato personal, inclúyalo antes de la pregunta'}`);
   if (lead.datos.propiedad_id) {
     const prop = catalogo.get(lead.datos.propiedad_id);
-    if (prop) lineas.push(`- Consulta por esta propiedad: ${prop.tipo} en ${[prop.barrio, prop.ciudad].filter(Boolean).join(', ')}, ${prop.moneda} ${prop.precio} (${prop.url}). Ficha: ${prop.resumen}`);
+    if (prop) {
+      lineas.push(`- Consulta por esta propiedad: ${prop.tipo} en ${[prop.barrio, prop.ciudad].filter(Boolean).join(', ')}, ${prop.moneda} ${prop.precio} (${prop.url}).`);
+      if (prop.descripcion) lineas.push(`  Descripción completa de la ficha (use esto para responder dudas):\n  ${prop.descripcion.replace(/\n/g, '\n  ')}`);
+    }
   }
   lineas.push(`- Datos ya capturados (no los vuelva a preguntar): ${JSON.stringify(lead.datos)}`);
   if (lead.derived_at) lineas.push('- Este lead YA fue derivado a un asesor.');

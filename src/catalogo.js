@@ -37,22 +37,22 @@ function sync(archivo = config.catalogo?.archivo) {
   const ts = new Date().toISOString();
   const upsert = conn.prepare(`
     INSERT INTO propiedades (id, tenant_id, operacion, tipo, barrio, ciudad, direccion, dormitorios, banos,
-      superficie_m2, terreno_m2, precio, moneda, asesor_nombre, url, resumen, activo, updated_at)
+      superficie_m2, terreno_m2, precio, moneda, asesor_nombre, url, resumen, descripcion, activo, updated_at)
     VALUES (@id, @tenant_id, @operacion, @tipo, @barrio, @ciudad, @direccion, @dormitorios, @banos,
-      @superficie_m2, @terreno_m2, @precio, @moneda, @asesor_nombre, @url, @resumen, 1, @updated_at)
+      @superficie_m2, @terreno_m2, @precio, @moneda, @asesor_nombre, @url, @resumen, @descripcion, 1, @updated_at)
     ON CONFLICT (tenant_id, id) DO UPDATE SET
       operacion = excluded.operacion, tipo = excluded.tipo, barrio = excluded.barrio, ciudad = excluded.ciudad,
       direccion = excluded.direccion, dormitorios = excluded.dormitorios, banos = excluded.banos,
       superficie_m2 = excluded.superficie_m2, terreno_m2 = excluded.terreno_m2, precio = excluded.precio,
       moneda = excluded.moneda, asesor_nombre = excluded.asesor_nombre, url = excluded.url,
-      resumen = excluded.resumen, activo = 1, updated_at = excluded.updated_at
+      resumen = excluded.resumen, descripcion = excluded.descripcion, activo = 1, updated_at = excluded.updated_at
   `);
   conn.transaction(() => {
     conn.prepare('UPDATE propiedades SET activo = 0 WHERE tenant_id = ?').run(T);
     for (const p of items) {
       upsert.run({
         barrio: null, ciudad: null, direccion: null, dormitorios: null, banos: null, superficie_m2: null,
-        terreno_m2: null, precio: null, moneda: null, asesor_nombre: null, url: null, resumen: null,
+        terreno_m2: null, precio: null, moneda: null, asesor_nombre: null, url: null, resumen: null, descripcion: null,
         ...p, id: String(p.id), tenant_id: T, updated_at: ts,
       });
     }
@@ -83,7 +83,7 @@ function buscar(filtros = {}) {
   if (filtros.zona) {
     const partes = norm(filtros.zona).split(/[,/]| - /).map((s) => s.trim()).filter((s) => s.length >= 3);
     const puntaje = (p) => {
-      const texto = norm([p.barrio, p.ciudad, p.direccion, p.resumen].join(' '));
+      const texto = norm([p.barrio, p.ciudad, p.direccion, p.resumen, p.descripcion].join(' '));
       return partes.filter((z) => texto.includes(z)).length;
     };
     const max = Math.max(0, ...props.map(puntaje));
@@ -119,6 +119,7 @@ function buscar(filtros = {}) {
       precio: p.precio,
       moneda: p.moneda,
       resumen: p.resumen,
+      descripcion: p.descripcion,
       url: p.url,
     })),
     nota: notas.join(' ') || undefined,
