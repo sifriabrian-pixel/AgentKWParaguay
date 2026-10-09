@@ -303,6 +303,15 @@ test('si la campaña no respeta la convención, el lead entra igual con campaign
   }
 });
 
+test('los celulares de Argentina y México se envían sin el dígito extra; Paraguay no cambia', () => {
+  const { normalizeTo } = require('../src/whatsapp');
+  assert.equal(normalizeTo('5493415492801'), '543415492801');
+  assert.equal(normalizeTo('5215512345678'), '525512345678');
+  assert.equal(normalizeTo('595981123456'), '595981123456');
+  assert.equal(normalizeTo('543415492801'), '543415492801');
+  assert.equal(normalizeTo('16315551181'), '16315551181');
+});
+
 test('los estados de entrega no retroceden', async () => {
   h.openDb(h.tmpDbPath());
   h.fakeClaude(h.toolThenText(null, 'Hola'));

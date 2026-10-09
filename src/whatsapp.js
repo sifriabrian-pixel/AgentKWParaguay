@@ -6,7 +6,18 @@ const GRAPH_VERSION = 'v21.0';
 // WHATSAPP_DRY_RUN=1 → no llama a Meta; loguea y devuelve un id falso.
 const dryRun = () => process.env.WHATSAPP_DRY_RUN === '1';
 
+// Los celulares de Argentina (549…) y México (521…) llegan en el webhook con
+// un dígito extra que Meta no acepta como destinatario (error 131030 en la
+// lista de permitidos). Se envía sin ese dígito. El wa_id guardado no cambia.
+function normalizeTo(to) {
+  const n = String(to);
+  if (/^549\d{10}$/.test(n)) return `54${n.slice(3)}`;
+  if (/^521\d{10}$/.test(n)) return `52${n.slice(3)}`;
+  return n;
+}
+
 async function post(body) {
+  body = { ...body, to: normalizeTo(body.to) };
   if (dryRun()) {
     const id = `wamid.dry.${crypto.randomUUID()}`;
     console.log(`[wa:dry] → ${body.to} (${body.type}) ${body.text?.body || body.template?.name || ''}`);
@@ -67,4 +78,4 @@ function verifySignature(rawBody, signatureHeader) {
   return a.length === b.length && crypto.timingSafeEqual(a, b);
 }
 
-module.exports = { sendMessage, sendTemplate, sendMedia, verifySignature };
+module.exports = { sendMessage, sendTemplate, sendMedia, verifySignature, normalizeTo };
