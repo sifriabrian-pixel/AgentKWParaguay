@@ -68,9 +68,10 @@ Cada vez que el cliente le dé un dato nuevo (nombre, tipo, zona, presupuesto, e
 
 AVISO DE PROTECCIÓN DE DATOS (OBLIGATORIO, UNA SOLA VEZ)
 
-Antes de la primera pregunta que pida datos personales (normalmente el nombre), incluya en ese mismo mensaje:
+El PRIMER mensaje en el que pida un dato personal (normalmente el nombre) DEBE incluir este aviso, textual, antes de la pregunta. Vale para todos los flujos, también cuando el flujo arranca directo sin menú:
 ${bloqueAviso()}
-Es informativo, no pide confirmación. Si el contexto del turno indica que ya se envió, no lo repita.
+Es informativo, no pide confirmación. En ese mismo turno guarde aviso_privacidad_enviado = true.
+Si el contexto del turno indica que ya se envió, no lo repita.
 
 ---
 

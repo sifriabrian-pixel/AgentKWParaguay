@@ -152,7 +152,7 @@ function buildContext(lead) {
     lineas.push('- Llegó de forma orgánica (no desde un anuncio).');
   }
 
-  lineas.push(`- Aviso de protección de datos: ${lead.consent_at ? 'YA enviado, no lo repita' : 'todavía NO enviado'}`);
+  lineas.push(`- Aviso de protección de datos: ${lead.consent_at ? 'YA enviado, no lo repita' : 'todavía NO enviado: si en este mensaje pide un dato personal, inclúyalo antes de la pregunta'}`);
   lineas.push(`- Datos ya capturados (no los vuelva a preguntar): ${JSON.stringify(lead.datos)}`);
   if (lead.derived_at) lineas.push('- Este lead YA fue derivado a un asesor.');
   return lineas.join('\n');
