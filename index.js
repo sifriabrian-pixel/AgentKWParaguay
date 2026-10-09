@@ -81,6 +81,7 @@ function startServer() {
 }
 
 if (require.main === module) {
+  console.log(`[server] Node ${process.version} · better-sqlite3 ${require('better-sqlite3/package.json').version}`);
   checkEnv();
   db.open();
   agent.recover();

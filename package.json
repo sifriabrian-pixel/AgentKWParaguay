@@ -10,7 +10,7 @@
     "test:e2e": "node test/e2e/redeploy.js"
   },
   "engines": {
-    "node": ">=20"
+    "node": "22.x"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.132.1",
