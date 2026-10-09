@@ -114,6 +114,13 @@ function applyGuardarDatos(waId, input) {
     cambios.push(`datos: ${Object.keys(nuevos).join(', ')}`);
   }
 
+  // Captación es solo venta: la operación queda fija sin depender del LLM.
+  const flujoFinal = campos.flujo || lead.flujo;
+  const datosFinal = campos.datos || lead.datos;
+  if (flujoFinal === 'captacion' && datosFinal.operacion !== 'venta') {
+    campos.datos = { ...datosFinal, operacion: 'venta' };
+  }
+
   if (input.aviso_privacidad_enviado === true && !lead.consent_at) {
     campos.consent_at = new Date().toISOString();
     repo.addEvent(lead.id, 'consent_notice_sent');

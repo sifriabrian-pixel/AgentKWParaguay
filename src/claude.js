@@ -24,7 +24,7 @@ const CAMPOS_DATOS = {
   dormitorios: { type: 'string' },
   formaPago: { type: 'string', enum: ['contado', 'financiado'] },
   fechaMudanza: { type: 'string' },
-  operacion: { type: 'string', enum: ['venta', 'alquiler'], description: 'solo flujo captacion' },
+  operacion: { type: 'string', enum: ['venta'], description: 'solo flujo captacion (siempre venta)' },
   dia: { type: 'string', description: 'día para la visita de tasación' },
   franja: { type: 'string', enum: ['manana', 'tarde', 'cualquiera'] },
   ciudad: { type: 'string', description: 'solo flujo reclutamiento' },
@@ -33,6 +33,7 @@ const CAMPOS_DATOS = {
   entrevistaConfirmada: { type: 'boolean' },
   descalificado: { type: 'boolean' },
   pide_humano: { type: 'boolean', description: 'true si pidió explícitamente hablar con una persona' },
+  derivar_oficina: { type: 'boolean', description: 'true si la consulta no entra en ningún flujo y la tiene que atender la oficina (por ejemplo, un propietario que quiere alquilar su propiedad)' },
   observacion: { type: 'string', description: 'contexto útil para el asesor, una oración' },
 };
 

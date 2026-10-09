@@ -303,6 +303,26 @@ test('si la campaña no respeta la convención, el lead entra igual con campaign
   }
 });
 
+test('captación es solo venta: la operación queda fija aunque el LLM no la mande', async () => {
+  h.openDb(h.tmpDbPath());
+  h.fakeClaude(h.toolThenText({ flujo: 'captacion', datos: { nombre: 'Rosa', zona: 'Luque' } }, 'ok'));
+  h.captureSends();
+  webhook.handlePayload(h.waPayload(WA, h.text('quiero vender mi casa en Luque')));
+  await agent.idle();
+  assert.deepEqual(repo.getCurrentLead(WA).datos, { nombre: 'Rosa', zona: 'Luque', operacion: 'venta' });
+});
+
+test('propietario que quiere alquilar su propiedad: sin flujo y marcado para la oficina', async () => {
+  h.openDb(h.tmpDbPath());
+  h.fakeClaude(h.toolThenText({ datos: { nombre: 'Rosa', tipo: 'casa', zona: 'Luque', derivar_oficina: true, observacion: 'Propietario quiere alquilar su propiedad' } }, 'ok'));
+  h.captureSends();
+  webhook.handlePayload(h.waPayload(WA, h.text('quiero poner en alquiler mi casa')));
+  await agent.idle();
+  const lead = repo.getCurrentLead(WA);
+  assert.equal(lead.flujo, null);
+  assert.equal(lead.datos.derivar_oficina, true);
+});
+
 test('los celulares de Argentina y México se envían sin el dígito extra; Paraguay no cambia', () => {
   const { normalizeTo } = require('../src/whatsapp');
   assert.equal(normalizeTo('5493415492801'), '543415492801');
