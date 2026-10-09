@@ -61,6 +61,10 @@ function sync(archivo = config.catalogo?.archivo) {
   return items.length;
 }
 
+function get(id) {
+  return db.get().prepare('SELECT * FROM propiedades WHERE tenant_id = ? AND id = ? AND activo = 1').get(T, String(id)) || null;
+}
+
 // Filtros: { operacion, tipo, zona, dormitorios_min, presupuesto_max, moneda }
 // Devuelve { total, propiedades: [...hasta 3], nota }
 function buscar(filtros = {}) {
@@ -74,9 +78,16 @@ function buscar(filtros = {}) {
     props = props.filter((p) => buscados.includes(norm(p.tipo)));
   }
 
+  // "Cruz del Chaco, Asunción": gana lo que coincide con más partes, así la
+  // calle o el edificio pesan más que la ciudad.
   if (filtros.zona) {
-    const z = norm(filtros.zona);
-    props = props.filter((p) => norm([p.barrio, p.ciudad, p.direccion, p.resumen].join(' ')).includes(z));
+    const partes = norm(filtros.zona).split(/[,/]| - /).map((s) => s.trim()).filter((s) => s.length >= 3);
+    const puntaje = (p) => {
+      const texto = norm([p.barrio, p.ciudad, p.direccion, p.resumen].join(' '));
+      return partes.filter((z) => texto.includes(z)).length;
+    };
+    const max = Math.max(0, ...props.map(puntaje));
+    props = max > 0 ? props.filter((p) => puntaje(p) === max) : [];
   }
 
   if (filtros.dormitorios_min) {
@@ -114,4 +125,4 @@ function buscar(filtros = {}) {
   };
 }
 
-module.exports = { sync, buscar };
+module.exports = { sync, buscar, get };

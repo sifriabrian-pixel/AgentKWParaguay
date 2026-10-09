@@ -34,6 +34,8 @@ const CAMPOS_DATOS = {
   descalificado: { type: 'boolean' },
   pide_humano: { type: 'boolean', description: 'true si pidió explícitamente hablar con una persona' },
   derivar_oficina: { type: 'boolean', description: 'true si la consulta no entra en ningún flujo y la tiene que atender la oficina (por ejemplo, un propietario que quiere alquilar su propiedad)' },
+  propiedad_id: { type: 'string', description: 'id de la propiedad del catálogo por la que consulta (de buscar_propiedades), cuando ya está claro cuál es' },
+  proposito: { type: 'string', enum: ['vivir', 'inversion'], description: 'para qué busca la propiedad' },
   observacion: { type: 'string', description: 'contexto útil para el asesor, una oración' },
 };
 
@@ -54,18 +56,17 @@ const TOOLS = [{
   },
 }, {
   name: 'buscar_propiedades',
-  description: 'Busca en el catálogo de Keller Williams Paraguay propiedades que coincidan con lo que pide el cliente. Usala solo cuando ya sabés la operación, el tipo y la zona. Devuelve hasta 3 opciones reales con su link; nunca muestres propiedades que no vengan de esta herramienta.',
+  description: 'Busca en el catálogo de Keller Williams Paraguay. Dos usos: (1) el cliente consulta por una propiedad puntual (calle, edificio, barrio o texto del anuncio): buscá con zona = esa referencia; (2) búsqueda general en compra/alquiler cuando ya sabés tipo y zona. Devuelve hasta 3 opciones reales con su link; nunca muestres propiedades que no vengan de esta herramienta.',
   input_schema: {
     type: 'object',
     properties: {
-      operacion: { type: 'string', enum: ['venta', 'alquiler'], description: 'venta si el cliente quiere comprar; alquiler si quiere alquilar' },
+      operacion: { type: 'string', enum: ['venta', 'alquiler'], description: 'venta si el cliente quiere comprar; alquiler si quiere alquilar. Omitir si consulta por una propiedad puntual y no se sabe.' },
       tipo: { type: 'string', description: 'departamento, monoambiente, casa, terreno, oficina, local comercial' },
-      zona: { type: 'string', description: 'barrio o ciudad, por ejemplo "Recoleta", "Las Lomas", "Lambaré"' },
+      zona: { type: 'string', description: 'barrio, ciudad, calle o nombre de edificio/proyecto: "Recoleta", "Lambaré", "Cruz del Chaco", "Mova del Sol"' },
       dormitorios_min: { type: 'integer' },
       presupuesto_max: { type: 'number' },
       moneda: { type: 'string', enum: ['USD', 'PYG'] },
     },
-    required: ['operacion'],
     additionalProperties: false,
   },
 }];

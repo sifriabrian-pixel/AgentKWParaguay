@@ -56,6 +56,38 @@ test('buscar: la zona busca también en la dirección y el resumen, sin tildes',
   assert.equal(catalogo.buscar({ operacion: 'alquiler' }).total, 0);
 });
 
+test('buscar: "Cruz del Chaco, Asunción" trae las dos unidades de esa calle y no todo Asunción', () => {
+  h.openDb(h.tmpDbPath());
+  catalogo.sync();
+  assert.deepEqual(ids(catalogo.buscar({ zona: 'Cruz del Chaco, Asunción' })), ['2165412433246526', '2165422816468416']);
+  assert.equal(catalogo.buscar({ zona: 'Mova del Sol' }).total, 3);
+  assert.equal(catalogo.buscar({ zona: 'Calle Inexistente' }).total, 0);
+});
+
+test('consulta por propiedad puntual: propiedad_id completa tipo, zona y flujo con la ficha real', async () => {
+  h.openDb(h.tmpDbPath());
+  catalogo.sync();
+  h.fakeClaude(h.toolThenText({ datos: { propiedad_id: '2165422816468416', proposito: 'inversion' } }, 'ok'));
+  h.captureSends();
+  webhook.handlePayload(h.waPayload('595981000098', h.text('Me interesa la propiedad de Cruz del Chaco')));
+  await agent.idle();
+  const lead = repo.getCurrentLead('595981000098');
+  assert.equal(lead.flujo, 'compra');
+  assert.deepEqual(lead.datos, { propiedad_id: '2165422816468416', proposito: 'inversion', tipo: 'departamento', zona: 'Recoleta, Asunción' });
+  assert.ok(repo.events(lead.id).some((e) => e.type === 'propiedad_consultada' && e.payload.asesor_nombre === 'Maria de la Paz Ramirez'));
+  assert.match(agent.buildContext(lead), /Consulta por esta propiedad: departamento en Recoleta/);
+});
+
+test('un propiedad_id que no existe en el catálogo se descarta', async () => {
+  h.openDb(h.tmpDbPath());
+  catalogo.sync();
+  h.fakeClaude(h.toolThenText({ datos: { propiedad_id: 'inventado-123' } }, 'ok'));
+  h.captureSends();
+  webhook.handlePayload(h.waPayload('595981000097', h.text('hola')));
+  await agent.idle();
+  assert.equal(repo.getCurrentLead('595981000097').datos.propiedad_id, undefined);
+});
+
 test('el agente puede buscar propiedades y queda registrado qué se ofreció', async () => {
   h.openDb(h.tmpDbPath());
   catalogo.sync();

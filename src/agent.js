@@ -109,6 +109,26 @@ function applyGuardarDatos(waId, input) {
   }
 
   const nuevos = sanitizeDatos(input.datos);
+
+  // Consulta por una propiedad puntual (típico de pauta): se valida contra el
+  // catálogo y se completan tipo, zona y flujo con los datos reales de la ficha.
+  if (nuevos.propiedad_id && nuevos.propiedad_id !== lead.datos.propiedad_id) {
+    const prop = catalogo.get(nuevos.propiedad_id);
+    if (!prop) {
+      delete nuevos.propiedad_id;
+      cambios.push('propiedad_id ignorado: no existe en el catálogo');
+    } else {
+      if (!lead.datos.tipo && !nuevos.tipo) nuevos.tipo = prop.tipo;
+      if (!lead.datos.zona && !nuevos.zona) nuevos.zona = [prop.barrio, prop.ciudad].filter(Boolean).join(', ');
+      const flujoProp = prop.operacion === 'alquiler' ? 'alquiler' : 'compra';
+      if (!lead.flujo && !campos.flujo) {
+        campos.flujo = flujoProp;
+        campos.lead_type = config.flujos[flujoProp].lead_type;
+      }
+      repo.addEvent(lead.id, 'propiedad_consultada', { propiedad_id: prop.id, url: prop.url, asesor_nombre: prop.asesor_nombre });
+    }
+  }
+
   if (Object.keys(nuevos).length) {
     campos.datos = { ...lead.datos, ...nuevos };
     cambios.push(`datos: ${Object.keys(nuevos).join(', ')}`);
@@ -168,19 +188,24 @@ function buildContext(lead) {
   lineas.push(`- Flujo actual: ${lead.flujo || 'sin definir'}`);
 
   if (lead.source === 'ctwa') {
+    const r = lead.referral || {};
+    const textoAnuncio = [r.headline, r.body].filter(Boolean).join(' — ');
     if (lead.campaign_status === 'ok' && lead.campaign_flujo) {
       const zona = lead.campaign_zona ? `, zona/proyecto: ${lead.campaign_zona}` : '';
       lineas.push(`- Llegó desde un anuncio de Meta. La pauta define flujo: ${lead.campaign_flujo}${zona}. No pregunte qué necesita: confirme y arranque ese flujo.`);
     } else {
-      const r = lead.referral || {};
-      const texto = [r.headline, r.body].filter(Boolean).join(' — ');
-      lineas.push(`- Llegó desde un anuncio de Meta${texto ? ` ("${texto.slice(0, 200)}")` : ''}. Detecte el flujo conversando.`);
+      lineas.push('- Llegó desde un anuncio de Meta. Detecte el flujo conversando.');
     }
+    if (textoAnuncio) lineas.push(`- Texto del anuncio: "${textoAnuncio.slice(0, 300)}" (si habla de una propiedad puntual, trátelo como CONSULTA POR UNA PROPIEDAD PUNTUAL)`);
   } else {
     lineas.push('- Llegó de forma orgánica (no desde un anuncio).');
   }
 
   lineas.push(`- Aviso de protección de datos: ${lead.consent_at ? 'YA enviado, no lo repita' : 'todavía NO enviado: si en este mensaje pide un dato personal, inclúyalo antes de la pregunta'}`);
+  if (lead.datos.propiedad_id) {
+    const prop = catalogo.get(lead.datos.propiedad_id);
+    if (prop) lineas.push(`- Consulta por esta propiedad: ${prop.tipo} en ${[prop.barrio, prop.ciudad].filter(Boolean).join(', ')}, ${prop.moneda} ${prop.precio} (${prop.url}). Ficha: ${prop.resumen}`);
+  }
   lineas.push(`- Datos ya capturados (no los vuelva a preguntar): ${JSON.stringify(lead.datos)}`);
   if (lead.derived_at) lineas.push('- Este lead YA fue derivado a un asesor.');
   return lineas.join('\n');
