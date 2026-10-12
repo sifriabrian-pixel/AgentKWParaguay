@@ -64,3 +64,12 @@ refactor no cambia el comportamiento. Ordenadas por impacto.
 12. **Si el LLM encadena 4 vueltas de herramientas sin escribir**, el turno
     termina con "no logré entender su mensaje" aunque el mensaje del lead haya
     sido claro (`MAX_VUELTAS = 4` en `claude.js`).
+
+## Detectadas en la prueba manual (2026-10-12)
+
+13. **Repite la pregunta pendiente si el lead escribe mientras el agente responde.**
+    Si entra un mensaje cuando el turno anterior ya está en curso, se responde en
+    un turno aparte. Como la pregunta anterior sigue sin contestar, el agente la
+    vuelve a hacer y el lead ve dos mensajes seguidos con la misma pregunta.
+    Arreglo habitual: esperar unos segundos antes de responder para juntar los
+    mensajes que llegan seguidos.
