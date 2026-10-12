@@ -19,7 +19,10 @@ function checkEnv() {
   const faltan = ['ANTHROPIC_API_KEY', 'WHATSAPP_VERIFY_TOKEN'].filter((k) => !process.env[k]);
   if (process.env.WHATSAPP_DRY_RUN !== '1') faltan.push(...['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'].filter((k) => !process.env[k]));
   if (faltan.length) console.warn(`[config] Faltan variables de entorno: ${faltan.join(', ')}`);
-  if (!process.env.WHATSAPP_APP_SECRET) console.warn('[config] WHATSAPP_APP_SECRET no configurado: el webhook no verifica la firma de Meta');
+  if (!process.env.WHATSAPP_APP_SECRET) {
+    if (process.env.WHATSAPP_DRY_RUN === '1') console.warn('[config] WHATSAPP_APP_SECRET no configurado: el webhook no verifica la firma de Meta (modo prueba)');
+    else console.error('[config] WHATSAPP_APP_SECRET no configurado: el webhook rechaza todos los mensajes hasta que se configure');
+  }
   if (!process.env.META_SYSTEM_TOKEN) console.warn('[config] META_SYSTEM_TOKEN no configurado: no se resuelven las campañas de los anuncios');
 }
 
