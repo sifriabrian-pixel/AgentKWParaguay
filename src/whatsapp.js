@@ -67,10 +67,11 @@ async function sendMedia(to, tipo, mediaId, caption) {
   return post({ to, type: key, [key]: media });
 }
 
-// Verifica la firma HMAC del webhook con el App Secret.
+// Verifica la firma HMAC del webhook con el App Secret. Sin App Secret no se
+// puede verificar nada: solo se acepta en modo prueba (WHATSAPP_DRY_RUN=1).
 function verifySignature(rawBody, signatureHeader) {
   const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appSecret) return true;
+  if (!appSecret) return dryRun();
   if (!signatureHeader) return false;
   const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
   const a = Buffer.from(expected);
