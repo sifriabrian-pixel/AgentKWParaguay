@@ -26,7 +26,7 @@ test('handleMessage devuelve mensajes, acciones y estado sin enviar nada', async
   const sent = h.captureSends();
   const adapter = createTestAdapter();
   h.fakeClaude(h.toolThenText(
-    { flujo: 'compra', datos: { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: 120000, moneda: 'USD' } },
+    { flujo: 'compra', datos: { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: 120000, moneda: 'USD', diaContacto: 'martes' } },
     'Perfecto, Ana. Le paso con un asesor. [HANDOFF_COMPRADOR]',
   ));
 
@@ -48,7 +48,8 @@ test('handleMessage devuelve mensajes, acciones y estado sin enviar nada', async
   assert.equal(sent.length, 0, 'el core no envía por WhatsApp');
   // La respuesta queda guardada sin enviar: marcarla es trabajo del adapter de WhatsApp.
   assert.equal(h.db.get().prepare("SELECT status FROM messages WHERE direction = 'out'").get().status, 'enviando');
-  // El tag no deriva: el lead sigue activo.
+  // Sin equipo configurado no hay a quién derivar: el lead sigue activo y queda el evento.
+  assert.ok(repo.events(out.state.leadId).some((e) => e.type === 'derivation_failed'));
   assert.equal(repo.getCurrentLead(WA).status, 'activo');
 });
 
@@ -57,7 +58,7 @@ test('handoff sin los datos requeridos: la acción sale marcada como no califica
   h.fakeClaude(h.toolThenText({ flujo: 'alquiler', datos: { tipo: 'casa' } }, 'Le paso con un asesor. [HANDOFF_ARRENDATARIO]'));
   const out = await adapter.handleMessage(msg('quiero alquilar una casa'));
   assert.equal(out.state.qualified, false);
-  assert.deepEqual(out.state.faltantes, ['zona', 'presupuesto']);
+  assert.deepEqual(out.state.faltantes, ['zona', 'presupuesto', 'diaContacto']);
   assert.equal(out.actions[0].payload.qualified, false);
 });
 
@@ -188,8 +189,12 @@ test('el adapter de test se niega a arrancar con credenciales reales en el entor
 });
 
 test('calificacion compara los datos contra los requeridos de cada flujo', () => {
-  assert.deepEqual(calificacion('compra', { tipo: 'casa', zona: 'Luque', presupuesto: 90000 }), { qualified: true, faltantes: [] });
-  assert.deepEqual(calificacion('alquiler', { tipo: 'casa', zona: 'Luque' }), { qualified: false, faltantes: ['presupuesto'] });
+  assert.deepEqual(calificacion('compra', { tipo: 'casa', zona: 'Luque', presupuesto: 90000, diaContacto: 'lunes' }), { qualified: true, faltantes: [] });
+  assert.deepEqual(calificacion('alquiler', { tipo: 'casa', zona: 'Luque' }), { qualified: false, faltantes: ['presupuesto', 'diaContacto'] });
+  // Consulta por una propiedad del catálogo: no hace falta el presupuesto.
+  assert.deepEqual(calificacion('compra', { propiedad_id: 'p1', tipo: 'casa', zona: 'Luque', formaPago: 'contado', diaContacto: 'lunes' }), { qualified: true, faltantes: [] });
+  assert.deepEqual(calificacion('compra', { propiedad_id: 'p1', presupuesto: 90000 }), { qualified: false, faltantes: ['formaPago', 'diaContacto'] });
+  assert.deepEqual(calificacion('alquiler', { propiedad_id: 'p1', formaPago: 'contado' }), { qualified: false, faltantes: ['fechaMudanza', 'diaContacto'] });
   assert.deepEqual(calificacion('captacion', { operacion: 'venta', zona: 'Luque', dia: 'martes', franja: 'tarde' }), { qualified: true, faltantes: [] });
   assert.deepEqual(calificacion('captacion', { operacion: 'venta', zona: 'Luque' }), { qualified: false, faltantes: ['dia', 'franja'] });
   const postulante = { ciudad: 'Asunción', disponibilidad: 'parcial', entrevistaConfirmada: true };
@@ -197,7 +202,7 @@ test('calificacion compara los datos contra los requeridos de cada flujo', () =>
   assert.equal(calificacion('reclutamiento', { ...postulante, entrevistaConfirmada: false }).qualified, false);
   assert.equal(calificacion('reclutamiento', { ...postulante, descalificado: true }).qualified, false);
   // El nombre no es requerido en ningún flujo; sin flujo no hay calificación.
-  assert.equal(calificacion(null, { tipo: 'casa', zona: 'Luque', presupuesto: 1 }).qualified, false);
+  assert.equal(calificacion(null, { tipo: 'casa', zona: 'Luque', presupuesto: 1, diaContacto: 'lunes' }).qualified, false);
   // Los requeridos salen de config: se pueden cambiar sin tocar el código.
   assert.equal(calificacion('captacion', { zona: 'Luque' }, { captacion: { requeridos: ['zona'] } }).qualified, true);
 });

@@ -12,7 +12,7 @@
 // AgentInput  = { conversationId, from, text, now?, messageId?, type?,
 //                 attachments?: [{ type, mediaId }],
 //                 metadata?: { source, adId, referral?, profileName? } }
-// AgentAction = { type: 'handoff' | 'forward_document', payload }
+// AgentAction = { type: 'handoff' | 'notify_advisor' | 'forward_document', payload }
 // AgentOutput = { messages, actions, state, meta }
 //
 // conversationId es el wa_id del lead. deps = { store, llm, resolveAd, onLlmError }.
@@ -24,11 +24,12 @@ const campanas = require('./campanas');
 const catalogo = require('./catalogo');
 const clock = require('./clock');
 const { calificacion } = require('./calificacion');
+const ruteo = require('./ruteo');
 const { pendiente } = require('../prompts/kw-py');
 
 const MSG_VACIO = 'Disculpe, no logré entender su mensaje. ¿Me lo podría escribir de otra forma?';
 
-// ─── Tags del LLM (solo informativos: NO derivan) ───────────────────────────
+// ─── Tags del LLM (piden el cierre; la derivación la decide derivar()) ───────
 const TAG_RE = /\[(HANDOFF_[A-Z_]+|AGENDA_ENTREVISTA|FLUJO_[A-Z_]+|CONSENT_GRANTED)\]/g;
 
 function extractTags(texto) {
@@ -199,7 +200,12 @@ function buildContext(lead) {
     }
   }
   lineas.push(`- Datos ya capturados (no los vuelva a preguntar): ${JSON.stringify(lead.datos)}`);
-  if (lead.derived_at) lineas.push('- Este lead YA fue derivado a un asesor.');
+  if (lead.derived_at) {
+    lineas.push('- Este lead YA fue derivado a un asesor.');
+  } else if (lead.flujo) {
+    const { faltantes } = calificacion(lead.flujo, lead.datos);
+    if (faltantes.length) lineas.push(`- Datos que faltan para pasar la consulta a un asesor: ${faltantes.join(', ')}. No cierre ni diga que le pasa la consulta hasta tenerlos (salvo que pida hablar con una persona).`);
+  }
   return lineas.join('\n');
 }
 
@@ -219,7 +225,7 @@ function toApiMessages(rows) {
 
 // ─── Estado y acciones ───────────────────────────────────────────────────────
 
-// Foto del lead para quien llama. qualified es informativo: no decide nada.
+// Foto del lead para quien llama.
 function buildState(lead, tags = []) {
   if (!lead) return { leadId: null, flujo: null, datos: {}, nombre: null, qualified: false, faltantes: [], derived: false, tags };
   const { qualified, faltantes } = calificacion(lead.flujo, lead.datos);
@@ -265,6 +271,49 @@ function handoffActions(lead, tags) {
     type: 'handoff',
     payload: { leadId: lead.id, waId: lead.wa_id, tag, flujo: state.flujo, nombre: state.nombre, qualified: state.qualified, faltantes: state.faltantes, datos: state.datos },
   }));
+}
+
+// ─── Derivación ──────────────────────────────────────────────────────────────
+
+// Decide si el lead se deriva en este turno y a quién. Se deriva una sola vez:
+//   - el LLM cerró el flujo (tag, en este turno o antes) y están los datos requeridos
+//   - pidió hablar con una persona: se deriva en el momento, aunque falten datos
+//   - consulta sin flujo marcada para la oficina (derivar_oficina)
+// Devuelve la acción notify_advisor, o nada. Enviar el aviso es del adapter.
+function derivar(lead, tags, store) {
+  if (lead.derived_at) return [];
+  const eventos = store.events(lead.id);
+  const { qualified, faltantes } = calificacion(lead.flujo, lead.datos);
+  const pideHumano = lead.datos.pide_humano === true;
+  const paraOficina = lead.datos.derivar_oficina === true && !lead.flujo;
+  const cerro = eventos.some((e) => e.type === 'llm_tag' && esTagDeDerivacion(e.payload.tag));
+
+  if (!pideHumano && !paraOficina && !(cerro && qualified)) {
+    if (tags.some(esTagDeDerivacion)) store.addEvent(lead.id, 'handoff_blocked', { faltantes });
+    return [];
+  }
+
+  const destino = ruteo.elegirDestino(lead, store);
+  if (!destino) {
+    if (!eventos.some((e) => e.type === 'derivation_failed')) store.addEvent(lead.id, 'derivation_failed', { motivo: 'sin_destino' });
+    return [];
+  }
+
+  let motivo = 'Lead calificado';
+  if (pideHumano) motivo = qualified ? 'Pidió hablar con una persona' : 'Pidió hablar con una persona (sin calificar)';
+  else if (paraOficina) motivo = 'Consulta para la oficina';
+
+  const { persona, regla } = destino;
+  store.markDerived(lead.id, persona.id);
+  store.addEvent(lead.id, 'derived', { asesor_id: persona.id, to: persona.whatsapp, regla, motivo, qualified });
+  const { params, texto } = ruteo.buildAviso(lead, motivo);
+  return [{
+    type: 'notify_advisor',
+    payload: {
+      leadId: lead.id, waId: lead.wa_id, to: persona.whatsapp, asesorId: persona.id, regla, motivo, qualified,
+      template: config.templates.avisoAsesor, idioma: config.templates.idioma, params, texto,
+    },
+  }];
 }
 
 // ─── Entrada ─────────────────────────────────────────────────────────────────
@@ -340,6 +389,8 @@ async function turno(waId, { store = repo, llm = claude, resolveAd, onLlmError }
 
   for (const tag of tags) store.addEvent(lead.id, 'llm_tag', { tag });
   actions.push(...handoffActions(lead, tags));
+  actions.push(...derivar(lead, tags, store));
+  lead = store.getCurrentLead(waId);
 
   const outboundId = store.commitTurn({ waId, leadId: lead.id, inboundIds: pendientes.map((m) => m.id), replyText: texto, tags });
   return { messages: [texto], actions, state: buildState(lead, tags), meta: { leadId: lead.id, outboundId } };

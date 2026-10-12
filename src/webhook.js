@@ -2,6 +2,7 @@
 const repo = require('./repo');
 const agent = require('./agent');
 const core = require('./core');
+const ruteo = require('./ruteo');
 
 const ESTADOS_WA = { sent: 'enviado', delivered: 'entregado', read: 'leido', failed: 'fallido' };
 const IGNORAR = new Set(['reaction', 'system', 'ephemeral']);
@@ -17,6 +18,11 @@ function handlePayload(payload) {
       for (const msg of value.messages || []) {
         const waId = msg.from;
         if (!waId) continue;
+        // Asesores, oficina y reclutamiento no son leads: no se les responde.
+        if (ruteo.esNumeroInterno(waId)) {
+          console.log(`[webhook] Mensaje de un número del equipo ignorado: ${waId}`);
+          continue;
+        }
 
         // 1. Origen del lead: se guarda ANTES de mirar el tipo de mensaje y
         //    antes de cualquier llamada al LLM. Si el primer mensaje es un

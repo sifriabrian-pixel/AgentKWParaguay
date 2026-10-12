@@ -13,17 +13,25 @@ module.exports = {
   // (captacion, solo venta) · Soy asesor (reclutamiento). Los propietarios que
   // quieren alquilar su propiedad no tienen flujo: datos.derivar_oficina = true.
   flujos: {
-    compra:       { requeridos: ['tipo', 'zona', 'presupuesto'],       excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_COMPRADOR' },
-    alquiler:     { requeridos: ['tipo', 'zona', 'presupuesto'],       excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_ARRENDATARIO' },
+    // requeridos: lo que hace falta para derivar. requeridosPuntual: lo mismo
+    // cuando el lead consulta por una propiedad del catálogo (datos.propiedad_id).
+    compra:       { requeridos: ['tipo', 'zona', 'presupuesto', 'diaContacto'], requeridosPuntual: ['propiedad_id', 'formaPago', 'diaContacto'],    excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_COMPRADOR' },
+    alquiler:     { requeridos: ['tipo', 'zona', 'presupuesto', 'diaContacto'], requeridosPuntual: ['propiedad_id', 'fechaMudanza', 'diaContacto'], excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_ARRENDATARIO' },
     captacion:    { requeridos: ['operacion', 'zona', 'dia', 'franja'], excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_PROPIETARIO' },
     reclutamiento:{ requeridos: ['ciudad', 'disponibilidad', 'entrevistaConfirmada'], excluye: ['descalificado'], lead_type: 'recruitment', tag: 'AGENDA_ENTREVISTA' },
   },
 
   campanas: { prefijo: 'KWPY', separador: '|', flujos: { COMPRA: 'compra', ALQUILER: 'alquiler', CAPTACION: 'captacion', RECLUTAMIENTO: 'reclutamiento' } },
 
-  asesores: [ /* { id, nombre, whatsapp, activo, flujos:[...], zonas:[...], proyectos:[...] } — PENDIENTE KW */ ],
-  oficina: { nombre: 'Oficina', whatsapp: '[PENDIENTE]' },
-  reclutamiento: { nombre: '[PENDIENTE]', whatsapp: '[PENDIENTE]' },
+  // A quién se derivan los leads (ver src/ruteo.js). Piloto: reclutamiento →
+  // responsable; compra/alquiler/captacion → asesores del flujo, por turnos;
+  // si no hay nadie → oficina. zonas y proyectos todavía no se usan para rutear.
+  // PRUEBA: un solo número (Brian) en los tres roles, hasta que KW pase su lista.
+  asesores: [
+    { id: 'prueba-brian', nombre: 'Brian (prueba)', whatsapp: '5493415907951', activa: true, flujos: ['compra', 'alquiler', 'captacion'], zonas: [], proyectos: [] },
+  ],
+  oficina: { nombre: 'Oficina', whatsapp: '5493415907951' },
+  reclutamiento: { nombre: 'Reclutamiento', whatsapp: '5493415907951' },
 
   templates: {
     avisoAsesor: 'nuevo_lead_asesor',

@@ -13,7 +13,8 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 | `src/core.js` | Lógica del turno, sin transporte: Claude, `guardar_datos`, contexto. Devuelve `{ messages, actions, state }`; nunca envía nada |
 | `src/agent.js` | Adapter de WhatsApp: cola por número, reintentos, envío y ejecución de las acciones del core |
 | `src/test-adapter.js` | Adapter de test (QA): core real sobre SQLite en memoria; registra las acciones sin ejecutarlas |
-| `src/calificacion.js` | `state.qualified`: datos capturados vs. `requeridos` de `config/kw-py.js` (informativo) |
+| `src/calificacion.js` | `state.qualified`: datos capturados vs. `requeridos` de `config/kw-py.js` |
+| `src/ruteo.js` | A quién se deriva cada lead (tabla `asesor_rr` para los turnos) y texto del aviso al asesor |
 | `src/clock.js` | Reloj inyectable (hora real en producción) |
 | `src/claude.js` | Llamada a Claude con la herramienta `guardar_datos` |
 | `src/catalogo.js` | Catálogo de propiedades: se carga desde `catalogo/*.json` al arrancar; el agente lo consulta con `buscar_propiedades` |
@@ -27,7 +28,7 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 - **Un mensaje por vez por número**: si el lead manda varios seguidos, se responden juntos.
 - **Redeploy**: lo que quedó pendiente se retoma al arrancar. Una respuesta que estaba saliendo justo en el corte se marca `desconocido` y no se reenvía (se prefiere no duplicar).
 - **Origen del lead**: el `referral` del anuncio se guarda antes de mirar el tipo de mensaje y antes de llamar a Claude.
-- **Los tags del LLM no derivan**: quedan como eventos `llm_tag` (la derivación es de la Fase 2).
+- **Derivación**: un lead se deriva una sola vez, cuando el LLM cierra el flujo y están los datos requeridos de `config/kw-py.js`, o en el momento si pide hablar con una persona. A quién va lo decide `src/ruteo.js` (reclutamiento → responsable; compra/alquiler/captación → asesores del flujo, por turnos; si no hay nadie → oficina). El aviso sale por la plantilla `nuevo_lead_asesor` y, si falla, como mensaje común.
 
 ## Correr local
 

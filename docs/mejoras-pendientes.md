@@ -34,6 +34,10 @@ refactor no cambia el comportamiento. Ordenadas por impacto.
 
 ## A resolver cuando se construya la derivación (Fase 2)
 
+> 6, 7 y 8 quedaron resueltos en la branch `feat/kw-derivacion` (derivación piloto).
+> Pendiente de esa branch: si el aviso al asesor no se puede enviar, el lead queda
+> marcado como derivado y solo se registra el evento `advisor_notify_failed`; no hay reintento.
+
 6. **`pide_humano` y `derivar_oficina` son solo datos.** No generan ninguna
    acción: un lead que pide hablar con una persona no dispara nada. El core hoy
    solo emite `handoff` cuando aparece un tag de cierre.

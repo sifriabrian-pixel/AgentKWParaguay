@@ -27,6 +27,7 @@ const CAMPOS_DATOS = {
   operacion: { type: 'string', enum: ['venta'], description: 'solo flujo captacion (siempre venta)' },
   dia: { type: 'string', description: 'día para la visita de tasación' },
   franja: { type: 'string', enum: ['manana', 'tarde', 'cualquiera'] },
+  diaContacto: { type: 'string', description: 'solo compra y alquiler: día de la semana que prefiere para que el asesor lo contacte' },
   ciudad: { type: 'string', description: 'solo flujo reclutamiento' },
   disponibilidad: { type: 'string' },
   experiencia: { type: 'string' },

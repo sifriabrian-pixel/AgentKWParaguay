@@ -50,10 +50,28 @@ async function forwardDocument({ leadId, waId, to, mediaType, mediaId, caption }
   }
 }
 
+// Aviso al asesor. Va por plantilla (el asesor casi nunca está dentro de la
+// ventana de 24 hs); si la plantilla falla, se intenta como mensaje común.
+async function notifyAdvisor({ leadId, waId, to, template, idioma, params, texto }) {
+  try {
+    await whatsapp.sendTemplate(to, template, idioma, params);
+    repo.addEvent(leadId, 'advisor_notified', { to, via: 'plantilla' });
+  } catch (ePlantilla) {
+    try {
+      await whatsapp.sendMessage(to, texto);
+      repo.addEvent(leadId, 'advisor_notified', { to, via: 'texto', error_plantilla: ePlantilla.message });
+    } catch (eTexto) {
+      console.error(`[derivacion] No se pudo avisar a ${to} por el lead ${waId}:`, eTexto.message);
+      repo.addEvent(leadId, 'advisor_notify_failed', { to, error_plantilla: ePlantilla.message, error_texto: eTexto.message });
+    }
+  }
+}
+
 async function runActions(actions) {
   for (const action of actions) {
     if (action.type === 'forward_document') await forwardDocument(action.payload);
-    // 'handoff': los tags del LLM todavía no derivan (queda el evento llm_tag).
+    if (action.type === 'notify_advisor') await notifyAdvisor(action.payload);
+    // 'handoff' es solo informativo: el LLM pidió cerrar. Derivar lo decide el core.
   }
 }
 

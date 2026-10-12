@@ -83,6 +83,28 @@ function updateLead(id, campos) {
     .run(...valores, now(), id);
 }
 
+// Marca el lead como derivado. Devuelve false si ya lo estaba (se deriva una sola vez).
+function markDerived(id, asesorId) {
+  const ts = now();
+  return db.get().prepare(`
+    UPDATE leads SET derived_at = ?, status = 'derivado', asesor_id = ?, updated_at = ? WHERE id = ? AND derived_at IS NULL
+  `).run(ts, asesorId, ts, id).changes === 1;
+}
+
+// Turnos entre asesores: devuelve el número de turno de ese grupo y lo avanza.
+function nextTurn(poolKey) {
+  const conn = db.get();
+  return conn.transaction(() => {
+    const row = conn.prepare('SELECT counter FROM asesor_rr WHERE tenant_id = ? AND pool_key = ?').get(T, poolKey);
+    if (!row) {
+      conn.prepare('INSERT INTO asesor_rr (tenant_id, pool_key, counter, updated_at) VALUES (?, ?, 1, ?)').run(T, poolKey, now());
+      return 0;
+    }
+    conn.prepare('UPDATE asesor_rr SET counter = counter + 1, updated_at = ? WHERE tenant_id = ? AND pool_key = ?').run(now(), T, poolKey);
+    return row.counter;
+  })();
+}
+
 // Cache de anuncios: si otro lead ya resolvió este ad_id, se reutiliza.
 function findResolvedAd(adId) {
   return db.get().prepare(`
@@ -203,7 +225,7 @@ function events(leadId) {
 }
 
 module.exports = {
-  getCurrentLead, getLead, createLead, captureInbound, updateLead, findResolvedAd,
+  getCurrentLead, getLead, createLead, captureInbound, updateLead, markDerived, nextTurn, findResolvedAd,
   insertInbound, pendingInbound, waIdsWithPending, bumpAttempts, history, commitTurn,
   insertOutbound, markOutbound, setDeliveryStatus, markStuckOutbound,
   addEvent, events,

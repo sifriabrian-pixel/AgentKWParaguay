@@ -9,6 +9,13 @@ const path = require('path');
 const db = require('../src/db');
 const claude = require('../src/claude');
 const whatsapp = require('../src/whatsapp');
+const config = require('../config/kw-py');
+
+// Los tests arrancan sin equipo configurado (nadie a quien derivar); cada test
+// que prueba la derivación carga el suyo.
+config.asesores = [];
+config.oficina = { nombre: 'Oficina', whatsapp: '[PENDIENTE]' };
+config.reclutamiento = { nombre: '[PENDIENTE]', whatsapp: '[PENDIENTE]' };
 
 function tmpDbPath() {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'kw-test-'));
