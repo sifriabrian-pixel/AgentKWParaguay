@@ -27,6 +27,7 @@ const CAMPOS_DATOS = {
   operacion: { type: 'string', enum: ['venta'], description: 'solo flujo captacion (siempre venta)' },
   dia: { type: 'string', description: 'día para la visita de tasación' },
   franja: { type: 'string', enum: ['manana', 'tarde', 'cualquiera'] },
+  diaContacto: { type: 'string', description: 'solo compra y alquiler: día de la semana que prefiere para que el asesor lo contacte' },
   ciudad: { type: 'string', description: 'solo flujo reclutamiento' },
   disponibilidad: { type: 'string' },
   experiencia: { type: 'string' },
@@ -130,4 +131,4 @@ async function chat(historial, contexto, handlers) {
   return { texto: textos.join('\n\n'), stopReason };
 }
 
-module.exports = { chat, setClient, FLUJOS, CAMPOS_DATOS, MODEL };
+module.exports = { chat, setClient, FLUJOS, CAMPOS_DATOS, TOOLS, MODEL };

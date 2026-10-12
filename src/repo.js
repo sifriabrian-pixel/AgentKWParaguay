@@ -2,10 +2,11 @@
 // crítico queda en memoria del proceso.
 const crypto = require('crypto');
 const db = require('./db');
+const clock = require('./clock');
 const config = require('../config/kw-py');
 
 const T = config.tenant_id;
-const now = () => new Date().toISOString();
+const now = clock.nowISO;
 const uuid = () => crypto.randomUUID();
 
 function parseLead(row) {
@@ -82,6 +83,39 @@ function updateLead(id, campos) {
     .run(...valores, now(), id);
 }
 
+// Marca el lead como derivado. Devuelve false si ya lo estaba (se deriva una sola vez).
+function markDerived(id, asesorId) {
+  const ts = now();
+  return db.get().prepare(`
+    UPDATE leads SET derived_at = ?, status = 'derivado', asesor_id = ?, updated_at = ? WHERE id = ? AND derived_at IS NULL
+  `).run(ts, asesorId, ts, id).changes === 1;
+}
+
+// Turnos entre asesores: devuelve el número de turno de ese grupo y lo avanza.
+function nextTurn(poolKey) {
+  const conn = db.get();
+  return conn.transaction(() => {
+    const row = conn.prepare('SELECT counter FROM asesor_rr WHERE tenant_id = ? AND pool_key = ?').get(T, poolKey);
+    if (!row) {
+      conn.prepare('INSERT INTO asesor_rr (tenant_id, pool_key, counter, updated_at) VALUES (?, ?, 1, ?)').run(T, poolKey, now());
+      return 0;
+    }
+    conn.prepare('UPDATE asesor_rr SET counter = counter + 1, updated_at = ? WHERE tenant_id = ? AND pool_key = ?').run(now(), T, poolKey);
+    return row.counter;
+  })();
+}
+
+// Leads derivados cuyo aviso al asesor todavía no salió: falló (menos de
+// maxIntentos veces) o el proceso se cortó antes de enviarlo.
+function leadsSinAviso(maxIntentos, derivadosAntesDe) {
+  return db.get().prepare(`
+    SELECT l.*, (SELECT COUNT(*) FROM lead_events e WHERE e.lead_id = l.id AND e.type = 'advisor_notify_failed') AS fallos
+    FROM leads l
+    WHERE l.tenant_id = ? AND l.derived_at IS NOT NULL
+      AND NOT EXISTS (SELECT 1 FROM lead_events e WHERE e.lead_id = l.id AND e.type = 'advisor_notified')
+  `).all(T).filter((l) => l.fallos < maxIntentos && (l.fallos > 0 || l.derived_at < derivadosAntesDe)).map(parseLead);
+}
+
 // Cache de anuncios: si otro lead ya resolvió este ad_id, se reutiliza.
 function findResolvedAd(adId) {
   return db.get().prepare(`
@@ -124,17 +158,42 @@ function bumpAttempts(ids) {
   db.get().transaction(() => ids.forEach((id) => stmt.run(id)))();
 }
 
+// Reinicio de pruebas: el número arranca de cero sin borrar nada. Los leads
+// anteriores quedan cerrados, se crea uno nuevo y el historial que ve el
+// agente empieza después de este punto.
+function resetConversation(waId) {
+  const conn = db.get();
+  return conn.transaction(() => {
+    const anterior = getCurrentLead(waId);
+    conn.prepare("UPDATE messages SET status = 'procesado', processed_at = ? WHERE tenant_id = ? AND wa_id = ? AND direction = 'in' AND status = 'pendiente'").run(now(), T, waId);
+    conn.prepare("UPDATE leads SET status = 'cerrado', updated_at = ? WHERE tenant_id = ? AND wa_id = ?").run(now(), T, waId);
+    const desde = conn.prepare('SELECT COALESCE(MAX(rowid), 0) AS n FROM messages WHERE tenant_id = ? AND wa_id = ?').get(T, waId).n;
+    const nuevo = createLead(waId, { nombrePerfil: anterior?.nombre_perfil || null });
+    addEvent(nuevo.id, 'conversation_reset', { desde_mensaje: desde, lead_anterior: anterior?.id || null });
+    return nuevo;
+  })();
+}
+
+function inicioHistorial(waId) {
+  const row = db.get().prepare(`
+    SELECT e.payload FROM lead_events e JOIN leads l ON l.id = e.lead_id
+    WHERE l.tenant_id = ? AND l.wa_id = ? AND e.type = 'conversation_reset'
+    ORDER BY e.rowid DESC LIMIT 1
+  `).get(T, waId);
+  return row ? JSON.parse(row.payload).desde_mensaje : 0;
+}
+
 // Últimos N mensajes de texto del número (entrantes y salientes), en orden.
 function history(waId, limit = 40) {
   return db.get().prepare(`
     SELECT * FROM (
       SELECT rowid AS rid, * FROM messages
-      WHERE tenant_id = ? AND wa_id = ? AND body IS NOT NULL
+      WHERE tenant_id = ? AND wa_id = ? AND body IS NOT NULL AND rowid > ?
         AND NOT (direction = 'in' AND status = 'pendiente')
         AND NOT (direction = 'out' AND status IN ('fallido'))
       ORDER BY created_at DESC, rowid DESC LIMIT ?
     ) ORDER BY created_at, rid
-  `).all(T, waId, limit);
+  `).all(T, waId, inicioHistorial(waId), limit);
 }
 
 // Cierra un turno de forma atómica: marca los entrantes como procesados y
@@ -202,8 +261,8 @@ function events(leadId) {
 }
 
 module.exports = {
-  getCurrentLead, getLead, createLead, captureInbound, updateLead, findResolvedAd,
-  insertInbound, pendingInbound, waIdsWithPending, bumpAttempts, history, commitTurn,
+  getCurrentLead, getLead, createLead, captureInbound, updateLead, markDerived, nextTurn, findResolvedAd,
+  insertInbound, pendingInbound, waIdsWithPending, bumpAttempts, history, commitTurn, resetConversation, leadsSinAviso,
   insertOutbound, markOutbound, setDeliveryStatus, markStuckOutbound,
   addEvent, events,
 };

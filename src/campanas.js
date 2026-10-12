@@ -39,23 +39,25 @@ async function fetchAd(adId) {
 
 // Se llama una vez por lead que tiene ad_id y todavía no tiene campaign_status.
 // Nunca lanza: si algo falla, el lead sigue igual y queda campaign_parse_failed.
-async function resolveLeadCampaign(lead) {
+// resolveAd(adId) reemplaza la consulta a la Meta Marketing API (tests y QA).
+async function resolveLeadCampaign(lead, { store = repo, resolveAd } = {}) {
   if (!lead.ad_id || lead.campaign_status) return lead;
 
-  let ad = repo.findResolvedAd(lead.ad_id);
+  let ad = store.findResolvedAd(lead.ad_id);
   if (!ad) {
-    if (!process.env.META_SYSTEM_TOKEN) {
-      repo.updateLead(lead.id, { campaign_status: 'sin_token' });
-      repo.addEvent(lead.id, 'campaign_parse_failed', { ad_id: lead.ad_id, motivo: 'sin_token' });
-      return repo.getLead(lead.id);
+    if (!resolveAd && !process.env.META_SYSTEM_TOKEN) {
+      store.updateLead(lead.id, { campaign_status: 'sin_token' });
+      store.addEvent(lead.id, 'campaign_parse_failed', { ad_id: lead.ad_id, motivo: 'sin_token' });
+      return store.getLead(lead.id);
     }
     try {
-      ad = await fetchAd(lead.ad_id);
+      ad = await (resolveAd || fetchAd)(lead.ad_id);
+      if (!ad) throw new Error('anuncio no encontrado');
     } catch (e) {
       console.error(`[campanas] No se pudo resolver el anuncio ${lead.ad_id}:`, e.message);
-      repo.updateLead(lead.id, { campaign_status: 'api_failed' });
-      repo.addEvent(lead.id, 'campaign_parse_failed', { ad_id: lead.ad_id, motivo: 'api', error: e.message });
-      return repo.getLead(lead.id);
+      store.updateLead(lead.id, { campaign_status: 'api_failed' });
+      store.addEvent(lead.id, 'campaign_parse_failed', { ad_id: lead.ad_id, motivo: 'api', error: e.message });
+      return store.getLead(lead.id);
     }
   }
 
@@ -71,10 +73,10 @@ async function resolveLeadCampaign(lead) {
       campos.lead_type = config.flujos[parsed.flujo].lead_type;
     }
   }
-  repo.updateLead(lead.id, campos);
-  if (parsed) repo.addEvent(lead.id, 'campaign_resolved', { ad_id: lead.ad_id, ...ad, ...parsed });
-  else repo.addEvent(lead.id, 'campaign_parse_failed', { ad_id: lead.ad_id, motivo: 'convencion', campaign_name: ad.campaign_name });
-  return repo.getLead(lead.id);
+  store.updateLead(lead.id, campos);
+  if (parsed) store.addEvent(lead.id, 'campaign_resolved', { ad_id: lead.ad_id, ...ad, ...parsed });
+  else store.addEvent(lead.id, 'campaign_parse_failed', { ad_id: lead.ad_id, motivo: 'convencion', campaign_name: ad.campaign_name });
+  return store.getLead(lead.id);
 }
 
 module.exports = { parseCampaignName, resolveLeadCampaign };

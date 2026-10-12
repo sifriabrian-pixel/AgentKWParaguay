@@ -9,8 +9,13 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 | `config/kw-py.js` | Todo lo específico de KW: flujos, criterios de calificación, campañas, asesores, templates |
 | `prompts/kw-py.js` | System prompt (estático, cacheado) |
 | `index.js` | Servidor HTTP: `GET/POST /webhook`, `GET /health` (devuelve solo `ok`) |
-| `src/webhook.js` | Guarda referral y mensaje en la base **antes** de procesar |
-| `src/agent.js` | Turno de conversación: cola por número, Claude, `guardar_datos`, envío |
+| `src/webhook.js` | Guarda referral y mensaje en la base **antes** de procesar (vía `core.ingest`) |
+| `src/core.js` | Lógica del turno, sin transporte: Claude, `guardar_datos`, contexto. Devuelve `{ messages, actions, state }`; nunca envía nada |
+| `src/agent.js` | Adapter de WhatsApp: cola por número, reintentos, envío y ejecución de las acciones del core |
+| `src/test-adapter.js` | Adapter de test (QA): core real sobre SQLite en memoria; registra las acciones sin ejecutarlas |
+| `src/calificacion.js` | `state.qualified`: datos capturados vs. `requeridos` de `config/kw-py.js` |
+| `src/ruteo.js` | A quién se deriva cada lead (tabla `asesor_rr` para los turnos) y texto del aviso al asesor |
+| `src/clock.js` | Reloj inyectable (hora real en producción) |
 | `src/claude.js` | Llamada a Claude con la herramienta `guardar_datos` |
 | `src/catalogo.js` | Catálogo de propiedades: se carga desde `catalogo/*.json` al arrancar; el agente lo consulta con `buscar_propiedades` |
 | `src/campanas.js` | Resuelve `ad_id` → campaña (Meta Marketing API) y parsea `KWPY \| FLUJO \| ZONA \| ASESOR` |
@@ -20,10 +25,10 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 
 - **Nada crítico en memoria**: estado, historial, duplicados y pendientes viven en la base.
 - **Duplicados**: `messages.wa_message_id` es UNIQUE; un reintento de Meta no genera otra respuesta.
-- **Un mensaje por vez por número**: si el lead manda varios seguidos, se responden juntos.
+- **Un mensaje por vez por número**: si el lead manda varios seguidos, se responden juntos. Antes de responder se esperan unos segundos sin mensajes nuevos (`ESPERA_MENSAJES_MS`, por defecto 3000), y si entra uno mientras Claude responde, esa respuesta se descarta y se contesta todo junto.
 - **Redeploy**: lo que quedó pendiente se retoma al arrancar. Una respuesta que estaba saliendo justo en el corte se marca `desconocido` y no se reenvía (se prefiere no duplicar).
 - **Origen del lead**: el `referral` del anuncio se guarda antes de mirar el tipo de mensaje y antes de llamar a Claude.
-- **Los tags del LLM no derivan**: quedan como eventos `llm_tag` (la derivación es de la Fase 2).
+- **Derivación**: un lead se deriva una sola vez, cuando el LLM cierra el flujo y están los datos requeridos de `config/kw-py.js`, o en el momento si pide hablar con una persona. A quién va lo decide `src/ruteo.js` (reclutamiento → responsable; compra/alquiler/captación → asesores del flujo, por turnos; si no hay nadie → oficina). El aviso sale por la plantilla `nuevo_lead_asesor` y, si falla, como mensaje común.
 
 ## Correr local
 
@@ -36,7 +41,7 @@ npm start
 ## Tests
 
 ```bash
-npm test          # unitarios con Claude falso y WhatsApp en modo prueba
+npm test          # unitarios con Claude falso y WhatsApp en modo prueba (incluye test/core.test.js)
 npm run test:e2e  # servidor real: mata el proceso a mitad de turno y verifica que retome sin duplicar
 ```
 
