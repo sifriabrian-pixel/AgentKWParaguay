@@ -2,10 +2,11 @@
 // crítico queda en memoria del proceso.
 const crypto = require('crypto');
 const db = require('./db');
+const clock = require('./clock');
 const config = require('../config/kw-py');
 
 const T = config.tenant_id;
-const now = () => new Date().toISOString();
+const now = clock.nowISO;
 const uuid = () => crypto.randomUUID();
 
 function parseLead(row) {

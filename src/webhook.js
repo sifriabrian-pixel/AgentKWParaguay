@@ -1,6 +1,7 @@
 // Procesa el payload del webhook de WhatsApp Cloud API.
 const repo = require('./repo');
 const agent = require('./agent');
+const core = require('./core');
 
 const ESTADOS_WA = { sent: 'enviado', delivered: 'entregado', read: 'leido', failed: 'fallido' };
 const IGNORAR = new Set(['reaction', 'system', 'ephemeral']);
@@ -20,19 +21,19 @@ function handlePayload(payload) {
         // 1. Origen del lead: se guarda ANTES de mirar el tipo de mensaje y
         //    antes de cualquier llamada al LLM. Si el primer mensaje es un
         //    audio o un sticker, el anuncio igual queda registrado.
-        const lead = repo.captureInbound(waId, perfiles[waId] || null, msg.referral || null);
-
-        if (IGNORAR.has(msg.type)) continue;
-
         // 2. Historial + filtro de duplicados (wa_message_id UNIQUE).
-        const nuevo = repo.insertInbound({
-          waId,
-          leadId: lead.id,
-          waMessageId: msg.id,
+        const ignorado = IGNORAR.has(msg.type);
+        const mediaId = ignorado ? null : agent.mediaIdOf(msg);
+        const { nuevo } = core.ingest({
+          conversationId: waId,
+          from: waId,
+          text: ignorado ? null : agent.describeInbound(msg),
+          messageId: msg.id,
           type: msg.type,
-          body: agent.describeInbound(msg),
-          mediaId: agent.mediaIdOf(msg),
+          attachments: mediaId ? [{ type: msg.type, mediaId }] : [],
+          metadata: { referral: msg.referral || null, profileName: perfiles[waId] || null },
         });
+        if (ignorado) continue;
         if (!nuevo) {
           console.log(`[webhook] Mensaje duplicado ignorado: ${msg.id}`);
           continue;

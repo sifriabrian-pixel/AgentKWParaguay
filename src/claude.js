@@ -130,4 +130,4 @@ async function chat(historial, contexto, handlers) {
   return { texto: textos.join('\n\n'), stopReason };
 }
 
-module.exports = { chat, setClient, FLUJOS, CAMPOS_DATOS, MODEL };
+module.exports = { chat, setClient, FLUJOS, CAMPOS_DATOS, TOOLS, MODEL };

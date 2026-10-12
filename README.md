@@ -9,8 +9,12 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 | `config/kw-py.js` | Todo lo específico de KW: flujos, criterios de calificación, campañas, asesores, templates |
 | `prompts/kw-py.js` | System prompt (estático, cacheado) |
 | `index.js` | Servidor HTTP: `GET/POST /webhook`, `GET /health` (devuelve solo `ok`) |
-| `src/webhook.js` | Guarda referral y mensaje en la base **antes** de procesar |
-| `src/agent.js` | Turno de conversación: cola por número, Claude, `guardar_datos`, envío |
+| `src/webhook.js` | Guarda referral y mensaje en la base **antes** de procesar (vía `core.ingest`) |
+| `src/core.js` | Lógica del turno, sin transporte: Claude, `guardar_datos`, contexto. Devuelve `{ messages, actions, state }`; nunca envía nada |
+| `src/agent.js` | Adapter de WhatsApp: cola por número, reintentos, envío y ejecución de las acciones del core |
+| `src/test-adapter.js` | Adapter de test (QA): core real sobre SQLite en memoria; registra las acciones sin ejecutarlas |
+| `src/calificacion.js` | `state.qualified`: datos capturados vs. `requeridos` de `config/kw-py.js` (informativo) |
+| `src/clock.js` | Reloj inyectable (hora real en producción) |
 | `src/claude.js` | Llamada a Claude con la herramienta `guardar_datos` |
 | `src/catalogo.js` | Catálogo de propiedades: se carga desde `catalogo/*.json` al arrancar; el agente lo consulta con `buscar_propiedades` |
 | `src/campanas.js` | Resuelve `ad_id` → campaña (Meta Marketing API) y parsea `KWPY \| FLUJO \| ZONA \| ASESOR` |
@@ -36,7 +40,7 @@ npm start
 ## Tests
 
 ```bash
-npm test          # unitarios con Claude falso y WhatsApp en modo prueba
+npm test          # unitarios con Claude falso y WhatsApp en modo prueba (incluye test/core.test.js)
 npm run test:e2e  # servidor real: mata el proceso a mitad de turno y verifica que retome sin duplicar
 ```
 
