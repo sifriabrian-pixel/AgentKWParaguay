@@ -14,7 +14,7 @@ module.exports = {
   pruebas: { reiniciar: '#reiniciar' },
 
   // Menú: Alquiler (alquiler) · Venta (compra) · Quiero vender mi propiedad
-  // (captacion, solo venta) · Soy asesor (reclutamiento). Los propietarios que
+  // (captacion, solo venta) · Quiero ser asesor (reclutamiento). Los propietarios que
   // quieren alquilar su propiedad no tienen flujo: datos.derivar_oficina = true.
   flujos: {
     // requeridos: lo que hace falta para derivar. requeridosPuntual: lo mismo
