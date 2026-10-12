@@ -25,7 +25,7 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 
 - **Nada crítico en memoria**: estado, historial, duplicados y pendientes viven en la base.
 - **Duplicados**: `messages.wa_message_id` es UNIQUE; un reintento de Meta no genera otra respuesta.
-- **Un mensaje por vez por número**: si el lead manda varios seguidos, se responden juntos.
+- **Un mensaje por vez por número**: si el lead manda varios seguidos, se responden juntos. Antes de responder se esperan unos segundos sin mensajes nuevos (`ESPERA_MENSAJES_MS`, por defecto 3000), y si entra uno mientras Claude responde, esa respuesta se descarta y se contesta todo junto.
 - **Redeploy**: lo que quedó pendiente se retoma al arrancar. Una respuesta que estaba saliendo justo en el corte se marca `desconocido` y no se reenvía (se prefiere no duplicar).
 - **Origen del lead**: el `referral` del anuncio se guarda antes de mirar el tipo de mensaje y antes de llamar a Claude.
 - **Derivación**: un lead se deriva una sola vez, cuando el LLM cierra el flujo y están los datos requeridos de `config/kw-py.js`, o en el momento si pide hablar con una persona. A quién va lo decide `src/ruteo.js` (reclutamiento → responsable; compra/alquiler/captación → asesores del flujo, por turnos; si no hay nadie → oficina). El aviso sale por la plantilla `nuevo_lead_asesor` y, si falla, como mensaje común.

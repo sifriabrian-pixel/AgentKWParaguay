@@ -3,6 +3,7 @@ const repo = require('./repo');
 const agent = require('./agent');
 const core = require('./core');
 const ruteo = require('./ruteo');
+const config = require('../config/kw-py');
 
 const ESTADOS_WA = { sent: 'enviado', delivered: 'entregado', read: 'leido', failed: 'fallido' };
 const IGNORAR = new Set(['reaction', 'system', 'ephemeral']);
@@ -28,6 +29,11 @@ function handlePayload(payload) {
         //    antes de cualquier llamada al LLM. Si el primer mensaje es un
         //    audio o un sticker, el anuncio igual queda registrado.
         // 2. Historial + filtro de duplicados (wa_message_id UNIQUE).
+        const comando = config.pruebas?.reiniciar;
+        if (comando && msg.type === 'text' && (msg.text?.body || '').trim().toLowerCase() === comando) {
+          agent.reset(waId).catch((e) => console.error(`[pruebas] Error reiniciando ${waId}:`, e));
+          continue;
+        }
         const ignorado = IGNORAR.has(msg.type);
         const mediaId = ignorado ? null : agent.mediaIdOf(msg);
         const { nuevo } = core.ingest({

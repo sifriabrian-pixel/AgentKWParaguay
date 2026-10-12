@@ -1,6 +1,7 @@
 // Utilidades de test: base temporal, Claude falso y WhatsApp capturado.
 process.env.WHATSAPP_DRY_RUN = '1';
 process.env.RETRY_BASE_MS = '10';
+process.env.ESPERA_MENSAJES_MS = '0';
 delete process.env.META_SYSTEM_TOKEN;
 
 const fs = require('fs');

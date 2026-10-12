@@ -9,6 +9,10 @@ module.exports = {
   zonaHoraria: 'America/Asuncion',
   franjaSeguimientos: { desde: '08:00', hasta: '21:00' },
 
+  // Etapa de pruebas: quien escriba exactamente este mensaje arranca de cero
+  // (ficha nueva, sin historial). APAGAR antes de abrir el número al público.
+  pruebas: { reiniciar: '#reiniciar' },
+
   // Menú: Alquiler (alquiler) · Venta (compra) · Quiero vender mi propiedad
   // (captacion, solo venta) · Soy asesor (reclutamiento). Los propietarios que
   // quieren alquilar su propiedad no tienen flujo: datos.derivar_oficina = true.

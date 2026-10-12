@@ -86,6 +86,9 @@ if (require.main === module) {
   db.open();
   require('./src/catalogo').sync();
   agent.recover();
+  const reintentarAvisos = () => agent.retryNotices().catch((e) => console.error('[derivacion] Error reintentando avisos:', e));
+  reintentarAvisos();
+  setInterval(reintentarAvisos, 5 * 60 * 1000).unref();
   const server = startServer();
 
   // Railway manda SIGTERM en cada redeploy: dejar de aceptar y cerrar la base.

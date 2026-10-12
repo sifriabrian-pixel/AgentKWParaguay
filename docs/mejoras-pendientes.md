@@ -34,9 +34,8 @@ refactor no cambia el comportamiento. Ordenadas por impacto.
 
 ## A resolver cuando se construya la derivación (Fase 2)
 
-> 6, 7 y 8 quedaron resueltos en la branch `feat/kw-derivacion` (derivación piloto).
-> Pendiente de esa branch: si el aviso al asesor no se puede enviar, el lead queda
-> marcado como derivado y solo se registra el evento `advisor_notify_failed`; no hay reintento.
+> 6, 7 y 8 quedaron resueltos con la derivación piloto. El aviso al asesor que no
+> se pudo enviar se reintenta al arrancar y cada 5 minutos, hasta 5 veces.
 
 6. **`pide_humano` y `derivar_oficina` son solo datos.** No generan ninguna
    acción: un lead que pide hablar con una persona no dispara nada. El core hoy
@@ -71,9 +70,18 @@ refactor no cambia el comportamiento. Ordenadas por impacto.
 
 ## Detectadas en la prueba manual (2026-10-12)
 
-13. **Repite la pregunta pendiente si el lead escribe mientras el agente responde.**
+13. **(Resuelto)** **Repite la pregunta pendiente si el lead escribe mientras el agente responde.**
     Si entra un mensaje cuando el turno anterior ya está en curso, se responde en
     un turno aparte. Como la pregunta anterior sigue sin contestar, el agente la
     vuelve a hacer y el lead ve dos mensajes seguidos con la misma pregunta.
     Arreglo habitual: esperar unos segundos antes de responder para juntar los
     mensajes que llegan seguidos.
+
+## Antes de abrir el número al público
+
+- **Apagar `#reiniciar`**: quitar `pruebas.reiniciar` de `config/kw-py.js`. Mientras
+  esté, cualquiera que escriba ese mensaje arranca su conversación de cero.
+- **Reemplazar el número de prueba** de `asesores`, `oficina` y `reclutamiento` en
+  `config/kw-py.js` por la lista real de KW.
+- **Plantilla `nuevo_lead_asesor`** aprobada por Meta: sin ella el aviso solo llega
+  si el asesor le escribió al agente en las últimas 24 horas.

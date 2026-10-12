@@ -27,6 +27,7 @@ const { calificacion } = require('./calificacion');
 const ruteo = require('./ruteo');
 const { pendiente } = require('../prompts/kw-py');
 
+const MAX_VUELTAS_TURNO = 3;
 const MSG_VACIO = 'Disculpe, no logré entender su mensaje. ¿Me lo podría escribir de otra forma?';
 
 // ─── Tags del LLM (piden el cierre; la derivación la decide derivar()) ───────
@@ -306,14 +307,13 @@ function derivar(lead, tags, store) {
   const { persona, regla } = destino;
   store.markDerived(lead.id, persona.id);
   store.addEvent(lead.id, 'derived', { asesor_id: persona.id, to: persona.whatsapp, regla, motivo, qualified });
-  const { params, texto } = ruteo.buildAviso(lead, motivo);
-  return [{
-    type: 'notify_advisor',
-    payload: {
-      leadId: lead.id, waId: lead.wa_id, to: persona.whatsapp, asesorId: persona.id, regla, motivo, qualified,
-      template: config.templates.avisoAsesor, idioma: config.templates.idioma, params, texto,
-    },
-  }];
+  return [{ type: 'notify_advisor', payload: avisoPayload(lead, { to: persona.whatsapp, asesorId: persona.id, regla, motivo, qualified }) }];
+}
+
+// Payload del aviso al asesor. También lo usa el adapter para reintentar un aviso que no salió.
+function avisoPayload(lead, destino) {
+  const { params, texto } = ruteo.buildAviso(lead, destino.motivo);
+  return { leadId: lead.id, waId: lead.wa_id, ...destino, template: config.templates.avisoAsesor, idioma: config.templates.idioma, params, texto };
 }
 
 // ─── Entrada ─────────────────────────────────────────────────────────────────
@@ -358,7 +358,8 @@ function ingest(input, { store = repo } = {}) {
 // Si Claude falla: sin onLlmError, lanza. Con onLlmError(error, { lead,
 // pendientes }), el adapter decide: devuelve un texto para cerrar el turno
 // con ese mensaje, o null para dejarlo pendiente (processPending devuelve null).
-async function turno(waId, { store = repo, llm = claude, resolveAd, onLlmError } = {}) {
+async function turno(waId, deps = {}, vuelta = 1) {
+  const { store = repo, llm = claude, resolveAd, onLlmError } = deps;
   const pendientes = store.pendingInbound(waId);
   let lead = store.getCurrentLead(waId);
   if (!pendientes.length) return { messages: [], actions: [], state: buildState(lead), meta: { leadId: lead?.id || null, outboundId: null } };
@@ -382,6 +383,10 @@ async function turno(waId, { store = repo, llm = claude, resolveAd, onLlmError }
     texto = await onLlmError(e, { lead, pendientes });
     if (texto == null) return null;
   }
+
+  // Entraron mensajes mientras Claude respondía: esa respuesta ya quedó vieja
+  // (repetiría la pregunta). Se descarta y se responde todo junto.
+  if (vuelta < MAX_VUELTAS_TURNO && store.pendingInbound(waId).length > pendientes.length) return turno(waId, deps, vuelta + 1);
 
   // El lead puede haber cambiado en el turno (abrir_flujo_adicional).
   lead = store.getCurrentLead(waId);
@@ -417,6 +422,6 @@ async function tick(conversationId, now, { store = repo } = {}) {
 }
 
 module.exports = {
-  ingest, processPending, handleMessage, tick, buildState,
+  ingest, processPending, handleMessage, tick, buildState, avisoPayload,
   extractTags, cleanTags, applyGuardarDatos, applyBuscarPropiedades, buildContext, toApiMessages,
 };

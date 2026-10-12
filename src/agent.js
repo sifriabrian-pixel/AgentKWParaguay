@@ -14,6 +14,11 @@ const core = require('./core');
 
 const MAX_INTENTOS = 3;
 const RETRY_BASE_MS = Number(process.env.RETRY_BASE_MS || 20000);
+// Antes de responder se espera a que el lead deje de escribir, para contestar
+// juntos los mensajes que llegan seguidos.
+const esperaMs = () => Number(process.env.ESPERA_MENSAJES_MS ?? 3000);
+const MAX_AVISOS = 5;
+const MSG_REINICIO = 'Conversación reiniciada. Puede empezar de nuevo.';
 const MSG_ERROR = 'Disculpe, tuvimos un inconveniente técnico. ¿Me podría escribir de nuevo en unos minutos?';
 
 // ─── Texto que representa cada tipo de mensaje de WhatsApp ───────────────────
@@ -67,6 +72,27 @@ async function notifyAdvisor({ leadId, waId, to, template, idioma, params, texto
   }
 }
 
+// Avisos que no salieron (falló el envío o el proceso se cortó): se vuelven a
+// intentar al arrancar y cada pocos minutos, hasta MAX_AVISOS veces por lead.
+let reintentando = false;
+async function retryNotices() {
+  if (reintentando) return 0;
+  reintentando = true;
+  try {
+    const hace2min = new Date(Date.now() - 2 * 60 * 1000).toISOString();
+    const leads = repo.leadsSinAviso(MAX_AVISOS, hace2min);
+    for (const lead of leads) {
+      const derivado = repo.events(lead.id).filter((e) => e.type === 'derived').pop();
+      if (!derivado) continue;
+      const { asesor_id: asesorId, to, regla, motivo, qualified } = derivado.payload;
+      await notifyAdvisor(core.avisoPayload(lead, { to, asesorId, regla, motivo, qualified }));
+    }
+    return leads.length;
+  } finally {
+    reintentando = false;
+  }
+}
+
 async function runActions(actions) {
   for (const action of actions) {
     if (action.type === 'forward_document') await forwardDocument(action.payload);
@@ -116,6 +142,21 @@ async function processTurn(waId) {
 // Una sola instancia del servicio: el bloqueo por número vive en el proceso,
 // pero lo que bloquea son filas de la base, que sobreviven al reinicio.
 const enCurso = new Map(); // waId → Promise
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Espera hasta que pase ese tiempo sin mensajes nuevos de ese número (con tope).
+async function esperarSilencio(waId) {
+  const espera = esperaMs();
+  if (!espera) return;
+  const tope = Date.now() + espera * 4;
+  let cantidad = repo.pendingInbound(waId).length;
+  for (;;) {
+    await dormir(espera);
+    const ahora = repo.pendingInbound(waId).length;
+    if (ahora === cantidad || Date.now() >= tope) return;
+    cantidad = ahora;
+  }
+}
 
 function kick(waId) {
   if (enCurso.has(waId)) {
@@ -128,6 +169,7 @@ function kick(waId) {
       do {
         estado.again = false;
         if (!repo.pendingInbound(waId).length) break;
+        await esperarSilencio(waId);
         const cerrado = await processTurn(waId);
         if (!cerrado) break; // reintento programado
       } while (estado.again || repo.pendingInbound(waId).length);
@@ -150,10 +192,23 @@ function recover() {
   return Promise.all(numeros.map((n) => kick(n)));
 }
 
+// Reinicio de pruebas (config.pruebas.reiniciar): el número arranca de cero.
+async function reset(waId) {
+  if (enCurso.has(waId)) await enCurso.get(waId).promise;
+  const lead = repo.resetConversation(waId);
+  console.log(`[pruebas] Conversación reiniciada: ${waId}`);
+  try {
+    await whatsapp.sendMessage(waId, MSG_REINICIO);
+  } catch (e) {
+    console.error(`[wa] Error enviando a ${waId}:`, e.message);
+  }
+  return lead;
+}
+
 function idle() {
   return Promise.all([...enCurso.values()].map((e) => e.promise));
 }
 
 const { extractTags, cleanTags, applyGuardarDatos, applyBuscarPropiedades, buildContext, toApiMessages } = core;
 
-module.exports = { kick, recover, idle, describeInbound, mediaIdOf, extractTags, cleanTags, applyGuardarDatos, applyBuscarPropiedades, buildContext, toApiMessages };
+module.exports = { kick, recover, idle, reset, retryNotices, describeInbound, mediaIdOf, extractTags, cleanTags, applyGuardarDatos, applyBuscarPropiedades, buildContext, toApiMessages };
