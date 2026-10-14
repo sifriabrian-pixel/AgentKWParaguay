@@ -18,6 +18,8 @@ Agente de WhatsApp (Cloud API + Claude) para Keller Williams Paraguay. Es un clo
 | `src/clock.js` | Reloj inyectable (hora real en producción) |
 | `src/claude.js` | Llamada a Claude con la herramienta `guardar_datos` |
 | `src/catalogo.js` | Catálogo de propiedades: se carga desde `catalogo/*.json` al arrancar; el agente lo consulta con `buscar_propiedades` |
+| `src/whatsapp.js` | Envío y firma del webhook. `WHATSAPP_PROVIDER=meta` (directo) o `kapso` (API proxy de Kapso, mismo formato de Meta) |
+| `src/kapso.js` | Con Kapso: al arrancar crea o verifica el webhook `kind: meta` del número, apuntando a este servicio y firmado con `KAPSO_WEBHOOK_SECRET` |
 | `src/campanas.js` | Resuelve `ad_id` → campaña (Meta Marketing API) y parsea `KWPY \| FLUJO \| ZONA \| ASESOR` |
 | `src/repo.js` / `src/db.js` | SQLite (WAL) y migraciones en `db/migrations/*.sql` |
 

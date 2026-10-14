@@ -16,12 +16,18 @@ function readBody(req) {
 }
 
 function checkEnv() {
-  const faltan = ['ANTHROPIC_API_KEY', 'WHATSAPP_VERIFY_TOKEN'].filter((k) => !process.env[k]);
-  if (process.env.WHATSAPP_DRY_RUN !== '1') faltan.push(...['WHATSAPP_TOKEN', 'WHATSAPP_PHONE_NUMBER_ID'].filter((k) => !process.env[k]));
+  const kapso = whatsapp.provider() === 'kapso';
+  console.log(`[config] Proveedor de WhatsApp: ${kapso ? 'Kapso' : 'Meta directo'}`);
+  const requeridas = ['ANTHROPIC_API_KEY'];
+  if (process.env.WHATSAPP_DRY_RUN !== '1') {
+    requeridas.push('WHATSAPP_PHONE_NUMBER_ID', ...(kapso ? ['KAPSO_API_KEY'] : ['WHATSAPP_TOKEN', 'WHATSAPP_VERIFY_TOKEN']));
+  }
+  const faltan = requeridas.filter((k) => !process.env[k]);
   if (faltan.length) console.warn(`[config] Faltan variables de entorno: ${faltan.join(', ')}`);
-  if (!process.env.WHATSAPP_APP_SECRET) {
-    if (process.env.WHATSAPP_DRY_RUN === '1') console.warn('[config] WHATSAPP_APP_SECRET no configurado: el webhook no verifica la firma de Meta (modo prueba)');
-    else console.error('[config] WHATSAPP_APP_SECRET no configurado: el webhook rechaza todos los mensajes hasta que se configure');
+  const secreto = kapso ? 'KAPSO_WEBHOOK_SECRET' : 'WHATSAPP_APP_SECRET';
+  if (!process.env[secreto]) {
+    if (process.env.WHATSAPP_DRY_RUN === '1') console.warn(`[config] ${secreto} no configurado: el webhook no verifica la firma (modo prueba)`);
+    else console.error(`[config] ${secreto} no configurado: el webhook rechaza todos los mensajes hasta que se configure`);
   }
   if (!process.env.META_SYSTEM_TOKEN) console.warn('[config] META_SYSTEM_TOKEN no configurado: no se resuelven las campañas de los anuncios');
 }
@@ -40,7 +46,7 @@ function startServer() {
 
     if (url.pathname === '/webhook' && req.method === 'POST') {
       const raw = await readBody(req);
-      if (!whatsapp.verifySignature(raw, req.headers['x-hub-signature-256'])) {
+      if (!whatsapp.verifySignature(raw, req.headers)) {
         console.error('[webhook] Firma inválida — rechazado');
         res.writeHead(403);
         res.end();
@@ -93,6 +99,7 @@ if (require.main === module) {
   reintentarAvisos();
   setInterval(reintentarAvisos, 5 * 60 * 1000).unref();
   const server = startServer();
+  if (whatsapp.provider() === 'kapso') require('./src/kapso').ensureWebhook();
 
   // Railway manda SIGTERM en cada redeploy: dejar de aceptar y cerrar la base.
   process.on('SIGTERM', () => {

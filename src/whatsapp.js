@@ -1,10 +1,22 @@
-// WhatsApp Cloud API (igual que Impacta) + modo prueba sin envíos reales.
+// Envío por WhatsApp Cloud API, directo a Meta o a través de Kapso, + modo
+// prueba sin envíos reales.
+//
+// WHATSAPP_PROVIDER=meta  (por defecto) → graph.facebook.com con WHATSAPP_TOKEN;
+//                                          webhook firmado por Meta (X-Hub-Signature-256).
+// WHATSAPP_PROVIDER=kapso               → api.kapso.ai/meta/whatsapp con KAPSO_API_KEY;
+//                                          webhook "kind: meta" firmado por Kapso
+//                                          (X-Webhook-Signature, hex sin prefijo).
+// En los dos casos el payload del webhook y el cuerpo de los envíos tienen el
+// formato de Meta, así que el resto del agente no cambia.
 const crypto = require('crypto');
 
-const GRAPH_VERSION = 'v21.0';
+const META_GRAPH_VERSION = 'v21.0';
+const KAPSO_GRAPH_VERSION = 'v24.0';
 
-// WHATSAPP_DRY_RUN=1 → no llama a Meta; loguea y devuelve un id falso.
+// WHATSAPP_DRY_RUN=1 → no envía nada; loguea y devuelve un id falso.
 const dryRun = () => process.env.WHATSAPP_DRY_RUN === '1';
+
+const provider = () => (process.env.WHATSAPP_PROVIDER || 'meta').toLowerCase() === 'kapso' ? 'kapso' : 'meta';
 
 // Los celulares de Argentina (549…) y México (521…) llegan en el webhook con
 // un dígito extra que Meta no acepta como destinatario (error 131030 en la
@@ -16,6 +28,22 @@ function normalizeTo(to) {
   return n;
 }
 
+// URL y headers del endpoint de mensajes según el proveedor.
+function endpoint() {
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  if (provider() === 'kapso') {
+    const base = (process.env.KAPSO_BASE_URL || 'https://api.kapso.ai/meta/whatsapp').replace(/\/$/, '');
+    return {
+      url: `${base}/${KAPSO_GRAPH_VERSION}/${phoneId}/messages`,
+      headers: { 'X-API-Key': process.env.KAPSO_API_KEY, 'Content-Type': 'application/json' },
+    };
+  }
+  return {
+    url: `https://graph.facebook.com/${META_GRAPH_VERSION}/${phoneId}/messages`,
+    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
+  };
+}
+
 async function post(body) {
   body = { ...body, to: normalizeTo(body.to) };
   if (dryRun()) {
@@ -23,13 +51,13 @@ async function post(body) {
     console.log(`[wa:dry] → ${body.to} (${body.type}) ${body.text?.body || body.template?.name || ''}`);
     return { messages: [{ id }] };
   }
-  const url = `https://graph.facebook.com/${GRAPH_VERSION}/${process.env.WHATSAPP_PHONE_NUMBER_ID}/messages`;
+  const { url, headers } = endpoint();
   const res = await fetch(url, {
     method: 'POST',
-    headers: { Authorization: `Bearer ${process.env.WHATSAPP_TOKEN}`, 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ messaging_product: 'whatsapp', ...body }),
   });
-  if (!res.ok) throw new Error(`WhatsApp API ${res.status}: ${await res.text()}`);
+  if (!res.ok) throw new Error(`WhatsApp API (${provider()}) ${res.status}: ${await res.text()}`);
   const json = await res.json();
   if (json?.messages?.[0]?.message_status === 'failed') {
     throw new Error(`WhatsApp mensaje rechazado: ${JSON.stringify(json)}`);
@@ -67,16 +95,31 @@ async function sendMedia(to, tipo, mediaId, caption) {
   return post({ to, type: key, [key]: media });
 }
 
-// Verifica la firma HMAC del webhook con el App Secret. Sin App Secret no se
-// puede verificar nada: solo se acepta en modo prueba (WHATSAPP_DRY_RUN=1).
-function verifySignature(rawBody, signatureHeader) {
-  const appSecret = process.env.WHATSAPP_APP_SECRET;
-  if (!appSecret) return dryRun();
-  if (!signatureHeader) return false;
-  const expected = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
-  const a = Buffer.from(expected);
-  const b = Buffer.from(signatureHeader);
-  return a.length === b.length && crypto.timingSafeEqual(a, b);
+function iguales(a, b) {
+  const x = Buffer.from(a);
+  const y = Buffer.from(b);
+  return x.length === y.length && crypto.timingSafeEqual(x, y);
 }
 
-module.exports = { sendMessage, sendTemplate, sendMedia, verifySignature, normalizeTo };
+// Verifica que el webhook venga de Meta o de Kapso, según el proveedor.
+// headers: los headers del request (en minúscula, como los da Node).
+// Sin secreto configurado no se puede verificar nada: solo se acepta en modo
+// prueba (WHATSAPP_DRY_RUN=1).
+function verifySignature(rawBody, headers = {}) {
+  if (provider() === 'kapso') {
+    const secret = process.env.KAPSO_WEBHOOK_SECRET;
+    if (!secret) return dryRun();
+    const firma = headers['x-webhook-signature'];
+    if (!firma) return false;
+    const esperada = crypto.createHmac('sha256', secret).update(rawBody).digest('hex');
+    return iguales(esperada, String(firma).toLowerCase());
+  }
+  const appSecret = process.env.WHATSAPP_APP_SECRET;
+  if (!appSecret) return dryRun();
+  const firma = headers['x-hub-signature-256'];
+  if (!firma) return false;
+  const esperada = 'sha256=' + crypto.createHmac('sha256', appSecret).update(rawBody).digest('hex');
+  return iguales(esperada, String(firma));
+}
+
+module.exports = { sendMessage, sendTemplate, sendMedia, verifySignature, normalizeTo, provider, endpoint };
