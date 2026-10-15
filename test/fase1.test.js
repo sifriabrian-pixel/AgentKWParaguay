@@ -344,3 +344,27 @@ test('los estados de entrega no retroceden', async () => {
   const fila = h.db.get().prepare("SELECT status FROM messages WHERE direction = 'out'").get();
   assert.equal(fila.status, 'leido');
 });
+
+test('muestra "escribiendo" sobre el último mensaje del cliente, y si falla igual responde', async () => {
+  h.openDb(h.tmpDbPath());
+  const whatsapp = require('../src/whatsapp');
+  const original = whatsapp.sendTyping;
+  const typing = [];
+  try {
+    whatsapp.sendTyping = async (id) => { typing.push(id); };
+    h.fakeClaude(h.toolThenText(null, 'Hola'));
+    const sent = h.captureSends();
+    webhook.handlePayload(h.waPayload(WA, h.text('hola', { id: 'wamid.T1' })));
+    await agent.idle();
+    assert.ok(typing.length >= 1);
+    assert.ok(typing.every((id) => id === 'wamid.T1'));
+    assert.equal(sent.length, 1);
+
+    whatsapp.sendTyping = async () => { throw new Error('Meta caído'); };
+    webhook.handlePayload(h.waPayload(WA, h.text('sigo acá', { id: 'wamid.T2' })));
+    await agent.idle();
+    assert.equal(sent.length, 2);
+  } finally {
+    whatsapp.sendTyping = original;
+  }
+});

@@ -158,6 +158,16 @@ async function esperarSilencio(waId) {
   }
 }
 
+// "Escribiendo…" en el WhatsApp del cliente mientras se arma la respuesta.
+// Va sobre el último mensaje pendiente. Si falla no frena nada.
+function mostrarEscribiendo(waId) {
+  const pendientes = repo.pendingInbound(waId);
+  const ultimo = pendientes[pendientes.length - 1];
+  if (!ultimo?.wa_message_id) return;
+  whatsapp.sendTyping(ultimo.wa_message_id)
+    .catch((e) => console.error(`[wa] No se pudo mostrar "escribiendo" a ${waId}:`, e.message));
+}
+
 function kick(waId) {
   if (enCurso.has(waId)) {
     enCurso.get(waId).again = true;
@@ -169,7 +179,10 @@ function kick(waId) {
       do {
         estado.again = false;
         if (!repo.pendingInbound(waId).length) break;
+        mostrarEscribiendo(waId);
         await esperarSilencio(waId);
+        // Se renueva: la espera para juntar mensajes consume parte de los 25 s.
+        mostrarEscribiendo(waId);
         const cerrado = await processTurn(waId);
         if (!cerrado) break; // reintento programado
       } while (estado.again || repo.pendingInbound(waId).length);

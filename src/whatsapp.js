@@ -45,10 +45,10 @@ function endpoint() {
 }
 
 async function post(body) {
-  body = { ...body, to: normalizeTo(body.to) };
+  if (body.to) body = { ...body, to: normalizeTo(body.to) };
   if (dryRun()) {
     const id = `wamid.dry.${crypto.randomUUID()}`;
-    console.log(`[wa:dry] → ${body.to} (${body.type}) ${body.text?.body || body.template?.name || ''}`);
+    console.log(`[wa:dry] → ${body.to || body.message_id} (${body.type || 'escribiendo'}) ${body.text?.body || body.template?.name || ''}`);
     return { messages: [{ id }] };
   }
   const { url, headers } = endpoint();
@@ -87,6 +87,12 @@ async function sendTemplate(to, nombrePlantilla, idioma, parametros = {}) {
   return post(body);
 }
 
+// Marca el mensaje del cliente como leído y muestra "escribiendo…" en su
+// WhatsApp. Se apaga solo cuando llega la respuesta o a los 25 segundos.
+async function sendTyping(messageId) {
+  return post({ status: 'read', message_id: messageId, typing_indicator: { type: 'text' } });
+}
+
 // Reenvía un documento o imagen recibido (por media_id de Meta) a otro número.
 async function sendMedia(to, tipo, mediaId, caption) {
   const key = tipo === 'document' ? 'document' : 'image';
@@ -122,4 +128,4 @@ function verifySignature(rawBody, headers = {}) {
   return iguales(esperada, String(firma));
 }
 
-module.exports = { sendMessage, sendTemplate, sendMedia, verifySignature, normalizeTo, provider, endpoint };
+module.exports = { sendMessage, sendTemplate, sendMedia, sendTyping, verifySignature, normalizeTo, provider, endpoint };

@@ -104,3 +104,12 @@ test('ensureWebhook no hace nada si faltan datos, y no lanza si Kapso falla', as
     assert.equal(conError.estado, 'error');
   } finally { f.restore(); }
 });
+
+test('"escribiendo" sale por Kapso: marca leído con typing_indicator y sin destinatario', async () => {
+  const f = fakeFetch(() => ({ json: { success: true } }));
+  try {
+    await conEntorno(KAPSO_ENV, () => whatsapp.sendTyping('wamid.ABC'));
+    assert.equal(f.calls[0].url, 'https://api.kapso.ai/meta/whatsapp/v24.0/111222333/messages');
+    assert.deepEqual(f.calls[0].body, { messaging_product: 'whatsapp', status: 'read', message_id: 'wamid.ABC', typing_indicator: { type: 'text' } });
+  } finally { f.restore(); }
+});
