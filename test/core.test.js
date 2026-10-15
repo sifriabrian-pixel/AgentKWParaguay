@@ -26,7 +26,7 @@ test('handleMessage devuelve mensajes, acciones y estado sin enviar nada', async
   const sent = h.captureSends();
   const adapter = createTestAdapter();
   h.fakeClaude(h.toolThenText(
-    { flujo: 'compra', datos: { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: 120000, moneda: 'USD', diaContacto: 'martes' } },
+    { flujo: 'compra', datos: { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: 120000, moneda: 'USD' } },
     'Perfecto, Ana. Le paso con un asesor. [HANDOFF_COMPRADOR]',
   ));
 
@@ -58,7 +58,7 @@ test('handoff sin los datos requeridos: la acción sale marcada como no califica
   h.fakeClaude(h.toolThenText({ flujo: 'alquiler', datos: { tipo: 'casa' } }, 'Le paso con un asesor. [HANDOFF_ARRENDATARIO]'));
   const out = await adapter.handleMessage(msg('quiero alquilar una casa'));
   assert.equal(out.state.qualified, false);
-  assert.deepEqual(out.state.faltantes, ['zona', 'presupuesto', 'diaContacto']);
+  assert.deepEqual(out.state.faltantes, ['zona', 'presupuesto']);
   assert.equal(out.actions[0].payload.qualified, false);
 });
 
@@ -97,14 +97,14 @@ test('el anuncio se resuelve con el mapa fijo, sin llamar a Meta', async () => {
 
 test('el reloj es inyectable: la hora del turno es la que se le pasa', async () => {
   const adapter = createTestAdapter();
-  const calls = h.fakeClaude(h.toolThenText({ aviso_privacidad_enviado: true }, 'Hola'));
+  const calls = h.fakeClaude(h.toolThenText({ datos: { nombre: 'Ana' } }, 'Hola'));
   const now = '2027-03-01T15:00:00.000Z';
   await adapter.handleMessage(msg('hola', { now }));
 
   const lead = repo.getCurrentLead(WA);
   assert.equal(lead.created_at, now);
   assert.equal(lead.last_inbound_at, now);
-  assert.equal(lead.consent_at, now);
+  assert.equal(lead.updated_at, now);
   assert.match(calls[0].system[1].text, /1 de marzo/);
   const fechas = h.db.get().prepare('SELECT DISTINCT created_at FROM messages').all().map((r) => r.created_at);
   assert.deepEqual(fechas, [now]);
@@ -189,20 +189,22 @@ test('el adapter de test se niega a arrancar con credenciales reales en el entor
 });
 
 test('calificacion compara los datos contra los requeridos de cada flujo', () => {
-  assert.deepEqual(calificacion('compra', { tipo: 'casa', zona: 'Luque', presupuesto: 90000, diaContacto: 'lunes' }), { qualified: true, faltantes: [] });
-  assert.deepEqual(calificacion('alquiler', { tipo: 'casa', zona: 'Luque' }), { qualified: false, faltantes: ['presupuesto', 'diaContacto'] });
-  // Consulta por una propiedad del catálogo: no hace falta el presupuesto.
-  assert.deepEqual(calificacion('compra', { propiedad_id: 'p1', tipo: 'casa', zona: 'Luque', formaPago: 'contado', diaContacto: 'lunes' }), { qualified: true, faltantes: [] });
-  assert.deepEqual(calificacion('compra', { propiedad_id: 'p1', presupuesto: 90000 }), { qualified: false, faltantes: ['formaPago', 'diaContacto'] });
-  assert.deepEqual(calificacion('alquiler', { propiedad_id: 'p1', formaPago: 'contado' }), { qualified: false, faltantes: ['fechaMudanza', 'diaContacto'] });
-  assert.deepEqual(calificacion('captacion', { operacion: 'venta', zona: 'Luque', dia: 'martes', franja: 'tarde' }), { qualified: true, faltantes: [] });
-  assert.deepEqual(calificacion('captacion', { operacion: 'venta', zona: 'Luque' }), { qualified: false, faltantes: ['dia', 'franja'] });
+  // KW: deriva con lo mínimo, sin día de contacto ni forma de pago ni visita.
+  assert.deepEqual(calificacion('compra', { tipo: 'casa', zona: 'Luque', presupuesto: 90000 }), { qualified: true, faltantes: [] });
+  assert.deepEqual(calificacion('alquiler', { tipo: 'casa', zona: 'Luque' }), { qualified: false, faltantes: ['presupuesto'] });
+  // Consulta por una propiedad del catálogo: compra con el nombre; alquiler con nombre y presupuesto.
+  assert.deepEqual(calificacion('compra', { propiedad_id: 'p1', nombre: 'Ana' }), { qualified: true, faltantes: [] });
+  assert.deepEqual(calificacion('compra', { propiedad_id: 'p1', presupuesto: 90000 }), { qualified: false, faltantes: ['nombre'] });
+  assert.deepEqual(calificacion('alquiler', { propiedad_id: 'p1', nombre: 'Ana' }), { qualified: false, faltantes: ['presupuesto'] });
+  assert.deepEqual(calificacion('alquiler', { propiedad_id: 'p1', nombre: 'Ana', presupuesto: 3000000 }), { qualified: true, faltantes: [] });
+  assert.deepEqual(calificacion('captacion', { operacion: 'venta', tipo: 'casa', zona: 'Luque' }), { qualified: true, faltantes: [] });
+  assert.deepEqual(calificacion('captacion', { operacion: 'venta', zona: 'Luque' }), { qualified: false, faltantes: ['tipo'] });
   const postulante = { ciudad: 'Asunción', disponibilidad: 'parcial', entrevistaConfirmada: true };
   assert.equal(calificacion('reclutamiento', postulante).qualified, true);
   assert.equal(calificacion('reclutamiento', { ...postulante, entrevistaConfirmada: false }).qualified, false);
   assert.equal(calificacion('reclutamiento', { ...postulante, descalificado: true }).qualified, false);
-  // El nombre no es requerido en ningún flujo; sin flujo no hay calificación.
-  assert.equal(calificacion(null, { tipo: 'casa', zona: 'Luque', presupuesto: 1, diaContacto: 'lunes' }).qualified, false);
+  // Sin flujo no hay calificación.
+  assert.equal(calificacion(null, { tipo: 'casa', zona: 'Luque', presupuesto: 1 }).qualified, false);
   // Los requeridos salen de config: se pueden cambiar sin tocar el código.
   assert.equal(calificacion('captacion', { zona: 'Luque' }, { captacion: { requeridos: ['zona'] } }).qualified, true);
 });

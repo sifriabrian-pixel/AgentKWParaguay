@@ -19,9 +19,11 @@ module.exports = {
   flujos: {
     // requeridos: lo que hace falta para derivar. requeridosPuntual: lo mismo
     // cuando el lead consulta por una propiedad del catálogo (datos.propiedad_id).
-    compra:       { requeridos: ['tipo', 'zona', 'presupuesto', 'diaContacto'], requeridosPuntual: ['propiedad_id', 'formaPago', 'diaContacto'],    excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_COMPRADOR' },
-    alquiler:     { requeridos: ['tipo', 'zona', 'presupuesto', 'diaContacto'], requeridosPuntual: ['propiedad_id', 'fechaMudanza', 'diaContacto'], excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_ARRENDATARIO' },
-    captacion:    { requeridos: ['operacion', 'zona', 'dia', 'franja'], excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_PROPIETARIO' },
+    // KW (2026-10-15): el agente deriva, no agenda. Sin día de contacto, forma
+    // de pago ni visita de tasación; el asesor coordina todo.
+    compra:       { requeridos: ['tipo', 'zona', 'presupuesto'], requeridosPuntual: ['propiedad_id', 'nombre'],                excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_COMPRADOR' },
+    alquiler:     { requeridos: ['tipo', 'zona', 'presupuesto'], requeridosPuntual: ['propiedad_id', 'nombre', 'presupuesto'], excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_ARRENDATARIO' },
+    captacion:    { requeridos: ['operacion', 'tipo', 'zona'], excluye: [], lead_type: 'commercial',  tag: 'HANDOFF_PROPIETARIO' },
     reclutamiento:{ requeridos: ['ciudad', 'disponibilidad', 'entrevistaConfirmada'], excluye: ['descalificado'], lead_type: 'recruitment', tag: 'AGENDA_ENTREVISTA' },
   },
 

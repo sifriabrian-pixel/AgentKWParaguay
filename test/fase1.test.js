@@ -68,7 +68,7 @@ test('un mensaje reenviado por Meta (mismo wa_message_id) se procesa una sola ve
 test('guardar_datos escribe en leads.datos y los tags no derivan', async () => {
   h.openDb(h.tmpDbPath());
   h.fakeClaude(h.toolThenText(
-    { flujo: 'compra', datos: { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: '120.000', moneda: 'USD', inventado: 'x' }, aviso_privacidad_enviado: true },
+    { flujo: 'compra', datos: { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: '120.000', moneda: 'USD', inventado: 'x' } },
     'Perfecto, Ana. Le paso con un asesor. [HANDOFF_COMPRADOR]',
   ));
   const sent = h.captureSends();
@@ -80,7 +80,6 @@ test('guardar_datos escribe en leads.datos y los tags no derivan', async () => {
   assert.equal(lead.flujo, 'compra');
   assert.equal(lead.lead_type, 'commercial');
   assert.deepEqual(lead.datos, { nombre: 'Ana', tipo: 'departamento', zona: 'Luque', presupuesto: 120000, moneda: 'USD' });
-  assert.ok(lead.consent_at);
   assert.equal(lead.derived_at, null);
   assert.equal(lead.status, 'activo');
   assert.equal(sent[0].text, 'Perfecto, Ana. Le paso con un asesor.');

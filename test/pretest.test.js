@@ -10,7 +10,7 @@ const whatsapp = require('../src/whatsapp');
 
 const WA = '595983000001';
 const ASESORA = { id: 'ana', nombre: 'Ana', whatsapp: '595981000201', activa: true, flujos: ['compra'], zonas: [], proyectos: [] };
-const COMPRA = { nombre: 'Luz', tipo: 'casa', zona: 'Luque', presupuesto: 90000, moneda: 'USD', diaContacto: 'martes' };
+const COMPRA = { nombre: 'Luz', tipo: 'casa', zona: 'Luque', presupuesto: 90000, moneda: 'USD' };
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const textoDe = (call) => call.messages.filter((m) => m.role === 'user' && typeof m.content === 'string').map((m) => m.content).join('\n');
 

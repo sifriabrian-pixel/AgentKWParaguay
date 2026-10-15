@@ -22,12 +22,8 @@ const CAMPOS_DATOS = {
   presupuesto: { type: 'number', description: 'solo el número, sin moneda ni separadores' },
   moneda: { type: 'string', enum: ['USD', 'PYG'] },
   dormitorios: { type: 'string' },
-  formaPago: { type: 'string', enum: ['contado', 'financiado'] },
   fechaMudanza: { type: 'string' },
   operacion: { type: 'string', enum: ['venta'], description: 'solo flujo captacion (siempre venta)' },
-  dia: { type: 'string', description: 'día para la visita de tasación' },
-  franja: { type: 'string', enum: ['manana', 'tarde', 'cualquiera'] },
-  diaContacto: { type: 'string', description: 'solo compra y alquiler: día de la semana que prefiere para que el asesor lo contacte' },
   ciudad: { type: 'string', description: 'solo flujo reclutamiento' },
   disponibilidad: { type: 'string' },
   experiencia: { type: 'string' },
@@ -36,7 +32,6 @@ const CAMPOS_DATOS = {
   pide_humano: { type: 'boolean', description: 'true si pidió explícitamente hablar con una persona' },
   derivar_oficina: { type: 'boolean', description: 'true si la consulta no entra en ningún flujo y la tiene que atender la oficina (por ejemplo, un propietario que quiere alquilar su propiedad)' },
   propiedad_id: { type: 'string', description: 'id de la propiedad del catálogo por la que consulta (de buscar_propiedades), cuando ya está claro cuál es' },
-  proposito: { type: 'string', enum: ['vivir', 'inversion'], description: 'para qué busca la propiedad' },
   observacion: { type: 'string', description: 'contexto útil para el asesor, una oración' },
 };
 
@@ -51,7 +46,6 @@ const TOOLS = [{
       flujo: { type: 'string', enum: FLUJOS, description: 'Fija o corrige el flujo de la conversación actual' },
       abrir_flujo_adicional: { type: 'string', enum: FLUJOS, description: 'Abre un segundo registro cuando el cliente tiene otra necesidad además de la actual' },
       datos: { type: 'object', properties: CAMPOS_DATOS, additionalProperties: false },
-      aviso_privacidad_enviado: { type: 'boolean' },
     },
     additionalProperties: false,
   },

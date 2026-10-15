@@ -132,11 +132,6 @@ function applyGuardarDatos(waId, input, store = repo) {
     campos.datos = { ...datosFinal, operacion: 'venta' };
   }
 
-  if (input.aviso_privacidad_enviado === true && !lead.consent_at) {
-    campos.consent_at = clock.nowISO();
-    store.addEvent(lead.id, 'consent_notice_sent');
-  }
-
   store.updateLead(lead.id, campos);
   const final = store.getLead(lead.id);
   return `Guardado (${cambios.join('; ') || 'sin cambios'}). Ficha actual: flujo=${final.flujo || 'sin definir'}, datos=${JSON.stringify(final.datos)}`;
@@ -192,7 +187,6 @@ function buildContext(lead) {
     lineas.push('- Llegó de forma orgánica (no desde un anuncio).');
   }
 
-  lineas.push(`- Aviso de protección de datos: ${lead.consent_at ? 'YA enviado, no lo repita' : 'todavía NO enviado: si en este mensaje pide un dato personal, inclúyalo antes de la pregunta'}`);
   if (lead.datos.propiedad_id) {
     const prop = catalogo.get(lead.datos.propiedad_id);
     if (prop) {

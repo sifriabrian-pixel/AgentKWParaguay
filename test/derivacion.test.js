@@ -21,7 +21,7 @@ function equipo({ asesores = [ANA, BETO, INACTIVA], oficina = OFICINA, reclutami
   config.reclutamiento = reclutamiento;
 }
 
-const COMPRA = { nombre: 'Luz', tipo: 'casa', zona: 'Luque', presupuesto: 90000, moneda: 'USD', diaContacto: 'martes' };
+const COMPRA = { nombre: 'Luz', tipo: 'casa', zona: 'Luque', presupuesto: 90000, moneda: 'USD' };
 let n = 0;
 const lead = () => `59598200${String(n += 1).padStart(4, '0')}`;
 const msg = (wa, text) => ({ conversationId: wa, from: wa, text });
@@ -44,7 +44,7 @@ test('lead calificado que cierra el flujo: se deriva al asesor del flujo con sus
     nombre: 'Luz',
     telefono: `+${wa}`,
     flujo: 'Compra',
-    datos: 'casa, Luque, hasta USD 90.000, contactar: martes',
+    datos: 'casa, Luque, hasta USD 90.000',
     resumen: '-',
   });
   assert.match(p.texto, /Nombre: Luz/);
@@ -87,17 +87,17 @@ test('tag de cierre sin los datos requeridos: no deriva; al completarlos sí, si
   equipo();
   const adapter = createTestAdapter();
   const wa = lead();
-  h.fakeClaude(h.toolThenText({ flujo: 'compra', datos: { tipo: 'casa', zona: 'Luque', presupuesto: 90000 } }, 'Le paso con un asesor. [HANDOFF_COMPRADOR]'));
-  const primero = await adapter.handleMessage(msg(wa, 'casa en Luque, 90.000'));
+  h.fakeClaude(h.toolThenText({ flujo: 'compra', datos: { tipo: 'casa', zona: 'Luque' } }, 'Le paso con un asesor. [HANDOFF_COMPRADOR]'));
+  const primero = await adapter.handleMessage(msg(wa, 'casa en Luque'));
   assert.equal(avisos(primero).length, 0);
   assert.equal(primero.state.derived, false);
   const bloqueo = repo.events(primero.state.leadId).find((e) => e.type === 'handoff_blocked');
-  assert.deepEqual(bloqueo.payload.faltantes, ['diaContacto']);
+  assert.deepEqual(bloqueo.payload.faltantes, ['presupuesto']);
 
   // El turno siguiente le avisa al LLM qué falta.
-  const calls = h.fakeClaude(h.toolThenText({ datos: { diaContacto: 'jueves' } }, 'Perfecto, el jueves.'));
-  const segundo = await adapter.handleMessage(msg(wa, 'el jueves'));
-  assert.match(calls[0].system[1].text, /Datos que faltan para pasar la consulta a un asesor: diaContacto/);
+  const calls = h.fakeClaude(h.toolThenText({ datos: { presupuesto: 90000, moneda: 'USD' } }, 'Perfecto.'));
+  const segundo = await adapter.handleMessage(msg(wa, 'hasta 90 mil dólares'));
+  assert.match(calls[0].system[1].text, /Datos que faltan para pasar la consulta a un asesor: presupuesto/);
   assert.equal(avisos(segundo).length, 1);
   assert.equal(avisos(segundo)[0].payload.motivo, 'Lead calificado');
 });
@@ -135,11 +135,11 @@ test('reclutamiento va al responsable; sin asesores para el flujo, a la oficina'
   assert.equal(rec.params.flujo, 'Quiere ser asesor');
 
   // Nadie atiende captación → oficina.
-  h.fakeClaude(h.toolThenText({ flujo: 'captacion', datos: { zona: 'Luque', dia: 'lunes', franja: 'tarde' } }, 'Listo. [HANDOFF_PROPIETARIO]'));
+  h.fakeClaude(h.toolThenText({ flujo: 'captacion', datos: { tipo: 'casa', zona: 'Luque' } }, 'Listo. [HANDOFF_PROPIETARIO]'));
   const cap = avisos(await adapter.handleMessage(msg(lead(), 'quiero vender mi casa')))[0].payload;
   assert.equal(cap.to, OFICINA.whatsapp);
   assert.equal(cap.regla, 'oficina');
-  assert.match(cap.params.datos, /visita: lunes, tarde/);
+  assert.match(cap.params.datos, /casa, Luque/);
 });
 
 test('propietario que quiere alquilar su propiedad: va a la oficina', async () => {
@@ -152,16 +152,15 @@ test('propietario que quiere alquilar su propiedad: va a la oficina', async () =
   assert.equal(p.params.resumen, 'Propietario quiere alquilar su propiedad');
 });
 
-test('consulta por una propiedad del catálogo: califica con forma de pago y día, sin presupuesto', async () => {
+test('consulta por una propiedad del catálogo: compra califica con el nombre, sin presupuesto', async () => {
   equipo();
   const adapter = createTestAdapter();
   const prop = h.db.get().prepare('SELECT * FROM propiedades LIMIT 1').get();
-  h.fakeClaude(h.toolThenText({ datos: { nombre: 'Luz', propiedad_id: prop.id, proposito: 'vivir', formaPago: 'contado', diaContacto: 'viernes' } }, 'Le paso con un asesor. [HANDOFF_COMPRADOR]'));
+  h.fakeClaude(h.toolThenText({ datos: { nombre: 'Luz', propiedad_id: prop.id } }, 'Le paso con un asesor. [HANDOFF_COMPRADOR]'));
   const out = await adapter.handleMessage(msg(lead(), 'me interesa esa propiedad'));
   assert.equal(out.state.qualified, true);
   const p = avisos(out)[0].payload;
   assert.match(p.params.resumen, new RegExp(`Consulta por ${prop.tipo}`));
-  assert.match(p.params.resumen, /Busca para vivir/);
   assert.ok(!/\n/.test(Object.values(p.params).join('')), 'las variables de la plantilla van en una sola línea');
 });
 

@@ -69,13 +69,13 @@ test('buscar: "Cruz del Chaco, Asunción" trae las dos unidades de esa calle y n
 test('consulta por propiedad puntual: propiedad_id completa tipo, zona y flujo con la ficha real', async () => {
   h.openDb(h.tmpDbPath());
   catalogo.sync();
-  h.fakeClaude(h.toolThenText({ datos: { propiedad_id: '2165422816468416', proposito: 'inversion' } }, 'ok'));
+  h.fakeClaude(h.toolThenText({ datos: { propiedad_id: '2165422816468416', nombre: 'Ana' } }, 'ok'));
   h.captureSends();
   webhook.handlePayload(h.waPayload('595981000098', h.text('Me interesa la propiedad de Cruz del Chaco')));
   await agent.idle();
   const lead = repo.getCurrentLead('595981000098');
   assert.equal(lead.flujo, 'compra');
-  assert.deepEqual(lead.datos, { propiedad_id: '2165422816468416', proposito: 'inversion', tipo: 'departamento', zona: 'Recoleta, Asunción' });
+  assert.deepEqual(lead.datos, { propiedad_id: '2165422816468416', nombre: 'Ana', tipo: 'departamento', zona: 'Recoleta, Asunción' });
   assert.ok(repo.events(lead.id).some((e) => e.type === 'propiedad_consultada' && e.payload.asesor_nombre === 'Maria de la Paz Ramirez'));
   assert.match(agent.buildContext(lead), /Consulta por esta propiedad: departamento en Recoleta/);
   assert.match(agent.buildContext(lead), /Cocheras: USD 17\.000/);
