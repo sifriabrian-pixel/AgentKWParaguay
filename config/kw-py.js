@@ -32,12 +32,14 @@ module.exports = {
   // A quién se derivan los leads (ver src/ruteo.js). Piloto: reclutamiento →
   // responsable; compra/alquiler/captacion → asesores del flujo, por turnos;
   // si no hay nadie → oficina. zonas y proyectos todavía no se usan para rutear.
-  // PRUEBA: un solo número (Brian) en los tres roles, hasta que KW pase su lista.
+  // Piloto con KW (2026-10-19): todas las derivaciones van a Natalia, hasta que
+  // KW pase la lista de asesores. Su número queda como "del equipo": el agente
+  // no le responde como si fuera un lead.
   asesores: [
-    { id: 'prueba-brian', nombre: 'Brian (prueba)', whatsapp: '5493415907951', activa: true, flujos: ['compra', 'alquiler', 'captacion'], zonas: [], proyectos: [] },
+    { id: 'natalia-kw', nombre: 'Natalia (KW)', whatsapp: '595994359511', activa: true, flujos: ['compra', 'alquiler', 'captacion'], zonas: [], proyectos: [] },
   ],
-  oficina: { nombre: 'Oficina', whatsapp: '5493415907951' },
-  reclutamiento: { nombre: 'Reclutamiento', whatsapp: '5493415907951' },
+  oficina: { nombre: 'Natalia (KW)', whatsapp: '595994359511' },
+  reclutamiento: { nombre: 'Natalia (KW)', whatsapp: '595994359511' },
 
   templates: {
     avisoAsesor: 'nuevo_lead_asesor',
