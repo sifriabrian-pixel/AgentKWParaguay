@@ -5,6 +5,7 @@ const db = require('./src/db');
 const whatsapp = require('./src/whatsapp');
 const webhook = require('./src/webhook');
 const agent = require('./src/agent');
+const panel = require('./src/panel');
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
@@ -73,6 +74,9 @@ function startServer() {
       }
       return;
     }
+
+    // Panel de KW (Chats y Stats), con contraseña. Sin DASHBOARD_PASSWORD no existe.
+    if (panel.handle(req, res, url)) return;
 
     if (url.pathname === '/health' || url.pathname === '/') {
       res.writeHead(200, { 'Content-Type': 'text/plain' });
