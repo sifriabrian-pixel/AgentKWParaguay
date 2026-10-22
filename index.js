@@ -75,8 +75,9 @@ function startServer() {
       return;
     }
 
-    // Panel de KW (Chats y Stats), con contraseña. Sin DASHBOARD_PASSWORD no existe.
-    if (panel.handle(req, res, url)) return;
+    // Panel de KW (el mismo del panel Sifer v2: Resumen y Leads), con contraseña.
+    // Sin DASHBOARD_PASSWORD ni ADMIN_PASSWORD no existe.
+    if (await panel.handle(req, res, url)) return;
 
     if (url.pathname === '/health' || url.pathname === '/') {
       res.writeHead(200, { 'Content-Type': 'text/plain' });

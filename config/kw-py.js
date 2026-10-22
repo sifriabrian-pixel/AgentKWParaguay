@@ -8,6 +8,10 @@ module.exports = {
   agente: { nombre: '[PENDIENTE]', tratamiento: '[PENDIENTE: usted|vos]' },
   zonaHoraria: 'America/Asuncion',
   franjaSeguimientos: { desde: '08:00', hasta: '21:00' },
+  // Horario de la oficina (minutos desde medianoche, [apertura, cierre); 0 = domingo).
+  // Se usa en el panel para "Fuera de horario". SUPUESTO: lun a vie 8 a 18 y
+  // sábado 8 a 12, hasta que KW confirme el suyo.
+  horarioOficina: { 1: [480, 1080], 2: [480, 1080], 3: [480, 1080], 4: [480, 1080], 5: [480, 1080], 6: [480, 720] },
 
   // Etapa de pruebas: quien escriba exactamente este mensaje arranca de cero
   // (ficha nueva, sin historial). APAGAR antes de abrir el número al público.
